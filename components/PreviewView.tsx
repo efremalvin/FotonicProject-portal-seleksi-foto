@@ -1,14 +1,19 @@
 "use client";
 
 import React from "react";
+import MasonryGallery from "./MasonryGallery";
 
 interface SelectedPhoto {
   id: string;
   name: string;
+  width?: number;
+  height?: number;
+  isLandscape?: boolean;
 }
 
 interface PreviewViewProps {
   clientName: string;
+  photoDate?: string | null;
   selectedPhotos: SelectedPhoto[];
   maxPhotos: number;
   notes: string;
@@ -17,10 +22,12 @@ interface PreviewViewProps {
   onBackToGallery: () => void;
   onConfirmSubmit: () => void;
   onPreview: (id: string, name: string) => void;
+  onToggle?: (id: string) => void;
 }
 
 export default function PreviewView({
   clientName,
+  photoDate,
   selectedPhotos,
   maxPhotos,
   notes,
@@ -29,157 +36,252 @@ export default function PreviewView({
   onBackToGallery,
   onConfirmSubmit,
   onPreview,
+  onToggle,
 }: PreviewViewProps) {
   return (
     <div
       style={{
-        maxWidth: "880px",
+        maxWidth: "960px",
         margin: "0 auto",
         padding: "24px 16px 80px 16px",
         animation: "fadeIn 0.28s ease-in-out",
       }}>
       {/* Header Halaman Pratinjau */}
       <div style={{ textAlign: "center", marginBottom: "28px" }}>
+        <div
+          style={{
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: "#d6a85a",
+            marginBottom: "8px",
+          }}>
+          Review Pilihan Foto
+        </div>
+
         <h1
           style={{
-            fontSize: "1.65rem",
+            fontSize: "clamp(1.5rem, 3.5vw, 2rem)",
             fontWeight: 800,
             color: "#ffffff",
             marginBottom: "8px",
             letterSpacing: "-0.5px",
           }}>
-          Tinjau Foto Terpilih
+          Tinjau Foto Terpilih — <span className="text-gradient-gold">{clientName}</span>
         </h1>
-        <p style={{ fontSize: "0.9rem", color: "#9496a1", lineHeight: "1.5" }}>
-          Pastikan foto-foto berikut adalah pilihan terbaik Anda sebelum dikirim
-          ke tim editor Fotonic.
+
+        {photoDate && (
+          <div
+            style={{
+              fontSize: "0.85rem",
+              color: "#a1a1aa",
+              marginBottom: "8px",
+            }}>
+            🗓️ Tanggal Sesi: <strong style={{ color: "#f0cf8e" }}>{photoDate}</strong>
+          </div>
+        )}
+
+        <p style={{ fontSize: "0.88rem", color: "#a1a1aa", lineHeight: "1.5" }}>
+          Pastikan foto-foto berikut adalah pilihan terbaik Anda sebelum dikirim ke tim editor Fotonic.
         </p>
+
+        {/* Counter Badge */}
         <div
           style={{
-            marginTop: "12px",
-            display: "inline-block",
-            backgroundColor: "rgba(34, 197, 94, 0.15)",
-            color: "#22c55e",
-            border: "1px solid rgba(34, 197, 94, 0.3)",
+            marginTop: "14px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            backgroundColor: "rgba(214, 168, 90, 0.14)",
+            color: "#f0cf8e",
+            border: "1px solid rgba(214, 168, 90, 0.35)",
             borderRadius: "9999px",
-            padding: "4px 14px",
-            fontSize: "0.82rem",
-            fontWeight: 700,
+            padding: "5px 16px",
+            fontSize: "0.85rem",
+            fontWeight: 800,
           }}>
-          Terpilih: {selectedPhotos.length} / {maxPhotos} Foto
+          <span>Terpilih: {selectedPhotos.length} / {maxPhotos} Foto</span>
         </div>
       </div>
 
-      {/* Grid Galeri Foto Terpilih */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: "20px",
-          marginBottom: "32px",
-        }}>
-        {selectedPhotos.map((photo) => (
-          <div
-            key={photo.id}
-            style={{
-              backgroundColor: "#16171e",
-              borderRadius: "20px",
-              padding: "10px",
-              border: "1.5px solid #22c55e",
-              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
-              position: "relative",
-              display: "flex",
-              flexDirection: "column",
-            }}>
-            {/* Foto Thumbnail */}
+      {/* Grid Galeri Foto Terpilih (Smart Masonry Tanpa Gap Kosong) */}
+      <div style={{ marginBottom: "32px" }}>
+        <MasonryGallery
+          photos={selectedPhotos as any}
+          renderItem={(photo) => (
             <div
               style={{
+                backgroundColor: "#16161a",
+                borderRadius: "20px",
+                padding: "10px",
+                border: "2px solid #d6a85a",
+                boxShadow: "0 6px 24px rgba(214, 168, 90, 0.22)",
                 position: "relative",
-                width: "100%",
-                aspectRatio: "3/4",
-                borderRadius: "14px",
-                overflow: "hidden",
-                backgroundColor: "#101117",
+                display: "flex",
+                flexDirection: "column",
               }}>
-              <img
-                src={`/api/thumbnail?id=${photo.id}`}
-                alt={photo.name}
-                loading="lazy"
+              {/* Foto Thumbnail Menyesuaikan Rasio (Contain) */}
+              <div
                 style={{
+                  position: "relative",
                   width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-              {/* Tombol Perbesar Pratinjau */}
-              <button
-                onClick={() => onPreview(photo.id, photo.name)}
-                title="Lihat Pratinjau Penuh"
-                style={{
-                  position: "absolute",
-                  top: "10px",
-                  right: "10px",
-                  backgroundColor: "rgba(0, 0, 0, 0.65)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "8px",
-                  width: "32px",
-                  height: "32px",
+                  borderRadius: "14px",
+                  overflow: "hidden",
+                  backgroundColor: "#0d0d10",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  cursor: "pointer",
-                  backdropFilter: "blur(4px)",
                 }}>
-                ⛶
-              </button>
-            </div>
+                <img
+                  src={`/api/thumbnail?id=${photo.id}`}
+                  alt={photo.name}
+                  loading="lazy"
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    objectFit: "contain",
+                    display: "block",
+                    borderRadius: "14px",
+                  }}
+                />
 
-            {/* Info Nama & Badge Terpilih */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 6px 4px 6px",
-              }}>
-              <span
+                {/* Badge Centang Emas di Kiri Atas Foto (Konsisten dengan PhotoCard) */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    left: "8px",
+                    backgroundColor: "#d6a85a",
+                    color: "#09090b",
+                    borderRadius: "50%",
+                    width: "26px",
+                    height: "26px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.85rem",
+                    fontWeight: 800,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                    zIndex: 2,
+                  }}>
+                  ✓
+                </div>
+
+                {/* Tombol Perbesar Pratinjau */}
+                <button
+                  onClick={() => onPreview(photo.id, photo.name)}
+                  title="Lihat Pratinjau Penuh"
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    backgroundColor: "rgba(9, 9, 11, 0.75)",
+                    color: "#f0cf8e",
+                    border: "1px solid rgba(214, 168, 90, 0.3)",
+                    borderRadius: "8px",
+                    width: "32px",
+                    height: "32px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    backdropFilter: "blur(4px)",
+                    zIndex: 2,
+                  }}>
+                  ⛶
+                </button>
+              </div>
+
+              {/* Info Nama & Badge Terpilih: Rapi 1 Baris, Tidak Pernah Patah */}
+              <div
                 style={{
-                  fontSize: "0.82rem",
-                  fontWeight: 700,
-                  color: "#e2e4ea",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: "65%",
-                }}>
-                {photo.name}
-              </span>
-              <span
-                style={{
-                  fontSize: "0.78rem",
-                  fontWeight: 700,
-                  color: "#22c55e",
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px",
+                  justifyContent: "space-between",
+                  gap: "8px",
+                  padding: "10px 4px 4px 4px",
+                  width: "100%",
+                  boxSizing: "border-box",
                 }}>
-                ✓ Terpilih
-              </span>
+                <span
+                  title={photo.name}
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    color: "#f0cf8e",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    flex: "1 1 auto",
+                    minWidth: 0,
+                  }}>
+                  {photo.name}
+                </span>
+
+                {onToggle ? (
+                  <button
+                    onClick={() => onToggle(photo.id)}
+                    title="Klik untuk membatalkan / mengubah pilihan foto ini"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+                      color: "#09090b",
+                      border: "none",
+                      borderRadius: "9999px",
+                      padding: "4px 10px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      cursor: "pointer",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      lineHeight: 1,
+                      transition: "transform 0.15s ease",
+                    }}>
+                    <span>✓</span>
+                    <span>Terpilih</span>
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+                      color: "#09090b",
+                      borderRadius: "9999px",
+                      padding: "4px 10px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      lineHeight: 1,
+                    }}>
+                    <span>✓</span>
+                    <span>Terpilih</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )}
+        />
       </div>
 
-      {/* Kotak Catatan Tambahan (Opsional) Sesuai HTML */}
+      {/* Kotak Catatan Tambahan (Opsional) */}
       <div
         style={{
-          backgroundColor: "#16171e",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-          borderRadius: "18px",
+          backgroundColor: "#16161a",
+          border: "1px solid rgba(214, 168, 90, 0.25)",
+          borderRadius: "20px",
           padding: "20px",
           marginBottom: "32px",
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
         }}>
         <label
           htmlFor="edit-notes"
@@ -200,90 +302,101 @@ export default function PreviewView({
           style={{
             width: "100%",
             minHeight: "100px",
-            padding: "12px 14px",
-            backgroundColor: "#101117",
+            padding: "14px 16px",
+            backgroundColor: "#0d0d10",
             border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: "12px",
-            color: "#f4f4f6",
+            borderRadius: "14px",
+            color: "#ededed",
             fontSize: "0.88rem",
             lineHeight: "1.5",
             outline: "none",
             resize: "vertical",
+            transition: "border-color 0.2s ease",
           }}
+          onFocus={(e) => (e.target.style.borderColor = "#d6a85a")}
+          onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
         />
       </div>
 
-      {/* Bagian Tombol Aksi: Group 13.jpg & Konfirmasi.jpg */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          gap: "14px",
-          alignItems: "center",
-        }}>
-        {/* Tombol Ubah Pilihan di Galeri (Sesuai Group 13.jpg) */}
-        <button
-          onClick={onBackToGallery}
-          disabled={isSubmitting}
-          style={{
-            flex: 1,
-            backgroundColor: "#1f1f21",
-            color: "#ffffff",
-            border: "1px solid rgba(255, 255, 255, 0.14)",
-            borderRadius: "16px",
-            padding: "14px 18px",
-            cursor: isSubmitting ? "not-allowed" : "pointer",
-            textAlign: "center",
-            lineHeight: "1.35",
-            transition: "all 0.2s ease",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
-          }}>
-          <div style={{ fontSize: "0.88rem", fontWeight: 700 }}>
-            Ubah Pilihan di
-          </div>
-          <div
-            style={{ fontSize: "0.88rem", fontWeight: 700, marginTop: "2px" }}>
-            ← Galeri
-          </div>
-        </button>
-
-        {/* Tombol Konfirmasi (Sesuai Konfirmasi.jpg) */}
+      {/* Bagian Tombol Aksi: Responsif Mobile & Desktop Tanpa Teks Terpotong / Ikon Tergencet */}
+      <div className="preview-action-container">
+        {/* Tombol Konfirmasi Pilihan (Gold Pill) */}
         <button
           onClick={onConfirmSubmit}
           disabled={isSubmitting}
+          className="preview-btn-confirm"
           style={{
-            flex: 1.3,
-            backgroundColor: isSubmitting ? "#5c3734" : "#dc3522",
-            color: "#ffffff",
+            background: isSubmitting
+              ? "#4a3c25"
+              : "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+            color: "#09090b",
             border: "none",
-            borderRadius: "9999px",
-            padding: "16px 24px",
-            fontSize: "0.98rem",
+            fontSize: "0.94rem",
             fontWeight: 800,
             cursor: isSubmitting ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "12px",
-            boxShadow: "0 6px 20px rgba(220, 53, 34, 0.45)",
-            transition: "all 0.2s ease",
+            boxShadow: "0 6px 20px rgba(214, 168, 90, 0.35)",
+            transition: "all 0.25s ease",
           }}>
-          <span>{isSubmitting ? "Menyimpan Data..." : "Konfirmasi"}</span>
-          <span
-            style={{
-              backgroundColor: "#ffffff",
-              color: "#dc3522",
-              borderRadius: "50%",
-              width: "24px",
-              height: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "0.85rem",
-              fontWeight: 900,
-            }}>
-            ✓
+          <span style={{ whiteSpace: "nowrap" }}>
+            {isSubmitting ? "Menyimpan Data..." : "Konfirmasi & Kirim Pilihan"}
           </span>
+          <span
+            className="preview-icon-badge"
+            style={{
+              backgroundColor: "#09090b",
+              color: "#f0cf8e",
+            }}>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </span>
+        </button>
+
+        {/* Tombol Ubah Pilihan di Galeri */}
+        <button
+          onClick={onBackToGallery}
+          disabled={isSubmitting}
+          className="preview-btn-back"
+          style={{
+            backgroundColor: "#16161a",
+            color: "#ededed",
+            border: "1.5px solid rgba(214, 168, 90, 0.4)",
+            cursor: isSubmitting ? "not-allowed" : "pointer",
+            fontSize: "0.9rem",
+            fontWeight: 700,
+            transition: "all 0.25s ease",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          }}>
+          <span
+            className="preview-icon-badge"
+            style={{
+              backgroundColor: "rgba(214, 168, 90, 0.12)",
+              color: "#f0cf8e",
+            }}>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}>
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </span>
+          <span style={{ whiteSpace: "nowrap" }}>Ubah Pilihan di Galeri</span>
         </button>
       </div>
     </div>

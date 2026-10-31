@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPhotosFromFolder } from "@/lib/google/drive";
+import { getPhotosFromFolder, getFolderDetails } from "@/lib/google/drive";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -13,8 +13,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const photos = await getPhotosFromFolder(folderId);
-    return NextResponse.json({ success: true, photos });
+    const [photos, folder] = await Promise.all([
+      getPhotosFromFolder(folderId),
+      getFolderDetails(folderId),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      folder,
+      photos,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Gagal mengambil daftar foto" },

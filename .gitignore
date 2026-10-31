@@ -1,6 +1,13 @@
+fotonic.json
+fotonic-project-*.json
+*.json
+.env
+.env.local
+.bat
 node_modules/
 .next/
 out/
 .env*.local
 *.pem
 service-account*.json
+*.tsbuildinfo

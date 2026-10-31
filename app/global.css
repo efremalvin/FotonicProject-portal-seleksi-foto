@@ -1,26 +1,23 @@
 :root {
-  --bg-color: #ffffff;
-  --text-color: #18181b;
-  --card-bg: rgba(125, 125, 125, 0.04);
-  --card-border: rgba(125, 125, 125, 0.2);
-  --header-bg: rgba(255, 255, 255, 0.94);
-  --header-border: rgba(0, 0, 0, 0.08);
-  --brand-red: #ff4b4b;
-  --brand-green: #22c55e;
+  --color-ink: #09090b;
+  --color-ink-soft: #111114;
+  --color-ink-card: #16161a;
+  --color-ink-card-hover: #1f1f26;
+  --color-ink-elevated: #1e1e24;
+
+  --color-gold: #d6a85a;
+  --color-gold-light: #f0cf8e;
+  --color-gold-dark: #b9853a;
+  --color-gold-border: rgba(214, 168, 90, 0.28);
+  --color-gold-glow: rgba(214, 168, 90, 0.18);
+
+  --color-wa: #25d366;
+  --color-success: #22c55e;
+  --color-text-main: #ededed;
+  --color-text-muted: #a1a1aa;
+  --color-text-subtle: #71717a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #0e0e10;
-    --text-color: #f4f4f5;
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --card-border: rgba(255, 255, 255, 0.12);
-    --header-bg: rgba(18, 18, 20, 0.94);
-    --header-border: rgba(255, 255, 255, 0.12);
-  }
-}
-
-/* Gunakan tanda bintang (*) untuk selektor semua elemen */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -28,17 +25,468 @@
   font-family: inherit;
 }
 
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
 body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: var(--color-ink);
+  background-image: 
+    radial-gradient(circle 380px at 15% 12%, rgba(214, 168, 90, 0.055), transparent 70%),
+    radial-gradient(circle 420px at 85% 38%, rgba(214, 168, 90, 0.045), transparent 70%),
+    radial-gradient(circle 350px at 15% 68%, rgba(214, 168, 90, 0.04), transparent 70%),
+    radial-gradient(circle 400px at 85% 90%, rgba(214, 168, 90, 0.05), transparent 75%);
+  background-attachment: fixed;
+  color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-ink);
 }
 
 ::-webkit-scrollbar {
   width: 8px;
 }
 
+::-webkit-scrollbar-track {
+  background: var(--color-ink);
+}
+
 ::-webkit-scrollbar-thumb {
-  background: var(--brand-red);
-  border-radius: 8px;
+  background: #27272a;
+  border-radius: 9999px;
+  border: 2px solid var(--color-ink);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold);
+}
+
+/* Proteksi Media: Nonaktifkan drag & seleksi gambar */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  user-select: none;
+}
+
+/* Teks Gradien Gold Mewah */
+.text-gradient-gold {
+  background: linear-gradient(120deg, var(--color-gold-light), var(--color-gold) 50%, var(--color-gold-dark));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Tombol Brand Gold */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 14px 26px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-ink);
+  background: linear-gradient(135deg, var(--color-gold-light) 0%, var(--color-gold) 50%, var(--color-gold-dark) 100%);
+  box-shadow: 0 4px 18px rgba(214, 168, 90, 0.28);
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-decoration: none;
+}
+
+.btn-gold:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 24px rgba(214, 168, 90, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-gold:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Responsive Hero Rules: Mobile Tampil Gambar Still, Desktop Clean (Permintaan #3) */
+.hero-mobile-section {
+  display: block;
+}
+.hero-desktop-clean {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .hero-mobile-section {
+    display: none !important;
+  }
+  .hero-desktop-clean {
+    display: flex !important;
+  }
+}
+
+/* Tata Letak Galeri: Smart Masonry Tanpa Gap Kosong (Landscape Otomatis Menyesuaikan di Samping Portrait) */
+.gallery-masonry-container {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.gallery-masonry-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .gallery-masonry-container {
+    gap: 16px;
+  }
+  .gallery-masonry-col {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .gallery-masonry-container {
+    gap: 20px;
+  }
+  .gallery-masonry-col {
+    gap: 20px;
+  }
+}
+
+.photo-masonry-item {
+  width: 100%;
+  display: block;
+}
+
+/* Tombol Aksi Halaman Preview: Konsisten, Sempurna di Mobile & Desktop (Tanpa Teks Terpotong / Ikon Tergencet) */
+.preview-action-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.preview-btn-confirm {
+  order: 1;
+  width: 100%;
+  min-height: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 24px;
+  white-space: nowrap !important;
+  letter-spacing: 0.01em;
+  box-sizing: border-box;
+}
+
+.preview-btn-confirm:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 8px 26px rgba(214, 168, 90, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+.preview-btn-confirm:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.preview-btn-back {
+  order: 2;
+  width: 100%;
+  min-height: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 24px;
+  white-space: nowrap !important;
+  letter-spacing: 0.01em;
+  box-sizing: border-box;
+}
+
+.preview-btn-back:hover:not(:disabled) {
+  border-color: #d6a85a !important;
+  background-color: #1f1f26 !important;
+  box-shadow: 0 6px 20px rgba(214, 168, 90, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+.preview-btn-back:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.preview-icon-badge {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+@media (min-width: 641px) {
+  .preview-action-container {
+    flex-direction: row;
+    justify-content: center;
+    gap: 16px;
+  }
+  .preview-btn-back {
+    order: 1;
+    flex: 1;
+    max-width: 300px;
+    width: auto;
+  }
+  .preview-btn-confirm {
+    order: 2;
+    flex: 1.25;
+    max-width: 360px;
+    width: auto;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================================================
+   FOOTER STYLING (EXACT REPLICA OF WEB-PORTO)
+   ========================================================= */
+.footer-section {
+  position: relative;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--color-ink, #09090b);
+  padding: 48px 16px 36px 16px;
+  margin-top: 60px;
+}
+
+@media (min-width: 640px) {
+  .footer-section {
+    padding: 64px 32px 40px 32px;
+  }
+}
+
+.footer-ambient-light {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(214, 168, 90, 0.3) 50%, transparent);
+}
+
+.footer-container {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .footer-content {
+    flex-direction: row;
+    text-align: left;
+    align-items: center;
+  }
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .footer-brand {
+    align-items: flex-start;
+  }
+}
+
+.footer-brand-link {
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.2s ease;
+}
+
+.footer-brand-link:hover {
+  opacity: 0.9;
+}
+
+.footer-brand-title {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.footer-brand-subtitle {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: #d6a85a;
+}
+
+.footer-quote {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #a1a1aa;
+}
+
+.footer-location {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(214, 168, 90, 0.95);
+}
+
+.footer-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+}
+
+@media (min-width: 640px) {
+  .footer-actions {
+    flex-direction: row;
+    width: auto;
+    max-width: none;
+  }
+}
+
+.footer-btn {
+  display: flex;
+  height: 46px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 0 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #e4e4e7;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .footer-btn {
+    width: 240px;
+  }
+}
+
+.footer-btn-wa:hover {
+  border-color: rgba(37, 211, 102, 0.6) !important;
+  background-color: rgba(37, 211, 102, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.25);
+}
+
+.footer-btn-ig:hover {
+  border-color: rgba(214, 168, 90, 0.6) !important;
+  background-color: rgba(214, 168, 90, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(214, 168, 90, 0.25);
+}
+
+.footer-btn-text {
+  white-space: nowrap;
+}
+
+.footer-copyright {
+  margin-top: 48px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 24px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+/* =========================================================
+   ANIMASI SHUTTER FOTONIC (LOADING SCREEN)
+   ========================================================= */
+@keyframes spinShutter {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseShutterRing {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 35px rgba(214, 168, 90, 0.22), inset 0 0 15px rgba(214, 168, 90, 0.12);
+    border-color: rgba(214, 168, 90, 0.35);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 50px rgba(214, 168, 90, 0.45), inset 0 0 25px rgba(214, 168, 90, 0.25);
+    border-color: rgba(214, 168, 90, 0.6);
+  }
+}
+
+.shutter-rotate-icon {
+  animation: spinShutter 8s linear infinite;
+}
+
+.shutter-pulse-ring {
+  animation: pulseShutterRing 2.4s ease-in-out infinite;
 }

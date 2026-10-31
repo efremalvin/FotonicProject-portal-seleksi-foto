@@ -1,19 +1,23 @@
-import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
-
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
+import type { Metadata, Viewport } from "next";
+import "./global.css";
 
 export const metadata: Metadata = {
-  title: "Fotonic - Seleksi Foto",
-  description: "Aplikasi seleksi foto pelanggan Fotonic",
+  title: "Fotonic - Seleksi Foto Klien",
+  description: "Portal seleksi foto resmi klien Fotonic Photo & Video Project",
   icons: {
-    icon: "/blacklogo2.png", // Mengambil langsung dari public/blacklogo2.png
-    apple: "/blacklogo2.png", // Opsional: untuk pintasan layar utama perangkat iOS/Safari
+    icon: [
+      { url: "/Fotonic Logo White.ico", sizes: "any" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/Fotonic Logo White.ico",
+    apple: "/whitelogo2.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -24,32 +28,19 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-              * {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-                font-family: inherit;
-              }
-              body {
-                background-color: #121214;
-                color: #f4f4f5;
-                -webkit-font-smoothing: antialiased;
-              }
-              ::-webkit-scrollbar {
-                width: 8px;
-              }
-              ::-webkit-scrollbar-thumb {
-                background: #ff4b4b;
-                border-radius: 8px;
-              }
-            `,
-          }}
+        <link rel="icon" href="/Fotonic Logo White.ico" sizes="any" />
+        <link rel="shortcut icon" href="/Fotonic Logo White.ico" />
+        <link rel="apple-touch-icon" href="/whitelogo2.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Tangerine:wght@400;700&display=swap"
+          rel="stylesheet"
         />
       </head>
-      <body className={montserrat.className}>{children}</body>
+      <body style={{ fontFamily: "'Montserrat', ui-sans-serif, system-ui, sans-serif" }}>
+        {children}
+      </body>
     </html>
   );
 }

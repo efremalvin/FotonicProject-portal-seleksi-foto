@@ -22,8 +22,8 @@ export default function PhotoModal({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.95)",
-        backdropFilter: "blur(12px)",
+        backgroundColor: "rgba(9, 9, 11, 0.96)",
+        backdropFilter: "blur(16px)",
         zIndex: 999999,
         display: "flex",
         flexDirection: "column",
@@ -38,66 +38,90 @@ export default function PhotoModal({
           position: "absolute",
           top: "16px",
           right: "16px",
-          backgroundColor: "rgba(255, 255, 255, 0.15)",
-          color: "#ffffff",
-          border: "none",
+          backgroundColor: "#16161a",
+          color: "#f0cf8e",
+          border: "1px solid rgba(214, 168, 90, 0.35)",
           borderRadius: "50%",
-          width: "40px",
-          height: "40px",
+          width: "42px",
+          height: "42px",
           fontSize: "1.2rem",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+          transition: "transform 0.2s ease",
         }}>
         ✕
       </button>
 
-      {/* Gambar Pratinjau */}
+      {/* Gambar Pratinjau (Menyesuaikan Rasio Asli Penuh, Tidak Crop) */}
       <div
         style={{
-          maxWidth: "90vw",
-          maxHeight: "75vh",
+          maxWidth: "92vw",
+          maxHeight: "78vh",
           display: "flex",
           justifyContent: "center",
+          alignItems: "center",
         }}>
         <img
           src={`/api/thumbnail?id=${id}`}
           alt={name}
           style={{
             maxWidth: "100%",
-            maxHeight: "75vh",
+            maxHeight: "78vh",
             objectFit: "contain",
-            borderRadius: "12px",
+            borderRadius: "14px",
+            border: isSelected ? "2px solid #d6a85a" : "1px solid rgba(255,255,255,0.1)",
+            boxShadow: isSelected
+              ? "0 12px 40px rgba(214, 168, 90, 0.35)"
+              : "0 12px 40px rgba(0,0,0,0.8)",
           }}
         />
       </div>
 
-      {/* Informasi & Tombol Toggle */}
+      {/* Informasi & Tombol Toggle Aksi */}
       <div
         style={{
-          marginTop: "18px",
+          marginTop: "20px",
           display: "flex",
           alignItems: "center",
-          gap: "16px",
+          gap: "18px",
+          backgroundColor: "#16161a",
+          padding: "10px 20px",
+          borderRadius: "9999px",
+          border: "1px solid rgba(214, 168, 90, 0.3)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
         }}>
         <span
-          style={{ color: "#ffffff", fontSize: "0.95rem", fontWeight: 600 }}>
+          style={{
+            color: isSelected ? "#f0cf8e" : "#ededed",
+            fontSize: "0.92rem",
+            fontWeight: 700,
+            maxWidth: "240px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
           {name}
         </span>
         <button
           onClick={() => onToggle(id)}
           style={{
-            backgroundColor: isSelected ? "#22c55e" : "#3b82f6",
-            color: "#ffffff",
-            border: "none",
+            background: isSelected
+              ? "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)"
+              : "rgba(214, 168, 90, 0.15)",
+            color: isSelected ? "#09090b" : "#f0cf8e",
+            border: isSelected ? "none" : "1px solid rgba(214, 168, 90, 0.4)",
             borderRadius: "9999px",
-            padding: "8px 20px",
-            fontSize: "0.85rem",
-            fontWeight: 700,
+            padding: "8px 22px",
+            fontSize: "0.86rem",
+            fontWeight: 800,
             cursor: "pointer",
+            boxShadow: isSelected ? "0 4px 14px rgba(214, 168, 90, 0.35)" : "none",
+            transition: "all 0.2s ease",
           }}>
-          {isSelected ? "Batal Pilih" : "Pilih Foto"}
+          {isSelected ? "✓ Batalkan Pilihan" : "+ Pilih Foto Ini"}
         </button>
       </div>
     </div>
