@@ -58,7 +58,7 @@ export default function MasonryGallery({ photos, renderItem }: MasonryGalleryPro
         cardHeight = photo.height / photo.width;
       }
 
-      colHeights[targetCol] += cardHeight + 0.28;
+      colHeights[targetCol] += cardHeight;
     }
 
     return cols;

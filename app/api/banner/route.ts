@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { driveClient } from "@/lib/google/auth";
 import { getBannerPhoto } from "@/lib/google/drive";
-import { Readable } from "stream";
+
+// Cache in-memory banner buffer (12 jam)
+interface CachedBanner {
+  buffer: ArrayBuffer;
+  contentType: string;
+  timestamp: number;
+}
+let bannerCache: CachedBanner | null = null;
+let bannerCacheFolderId = "";
+const BANNER_TTL = 12 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -14,6 +23,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Cek cache
+  if (
+    bannerCache &&
+    bannerCacheFolderId === folderId &&
+    Date.now() - bannerCache.timestamp < BANNER_TTL
+  ) {
+    return new NextResponse(bannerCache.buffer, {
+      headers: {
+        "Content-Type": bannerCache.contentType,
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",
+      },
+    });
+  }
+
   try {
     const bannerFile = await getBannerPhoto(folderId);
 
@@ -24,23 +47,45 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Prioritaskan mengambil dari Google CDN thumbnailLink (=w1280) -> Ringan (~120KB) vs Asli (25MB!)
+    if (bannerFile.thumbnailLink) {
+      const bannerUrl = bannerFile.thumbnailLink.replace(/=s\d+$/, "=w1280");
+      const res = await fetch(bannerUrl);
+      const buffer = await res.arrayBuffer();
+      const contentType = res.headers.get("content-type") || bannerFile.mimeType || "image/jpeg";
+
+      bannerCache = {
+        buffer,
+        contentType,
+        timestamp: Date.now(),
+      };
+      bannerCacheFolderId = folderId;
+
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",
+        },
+      });
+    }
+
+    // Fallback streaming media langsung jika thumbnailLink belum tersedia
     const res = await driveClient.files.get(
       { fileId: bannerFile.id, alt: "media" },
-      { responseType: "stream" }
+      { responseType: "arraybuffer" }
     );
 
-    const stream = res.data as unknown as Readable;
+    const buffer = res.data as ArrayBuffer;
     const contentType = (res.headers["content-type"] as string) || "image/jpeg";
 
-    const webStream = new ReadableStream({
-      start(controller) {
-        stream.on("data", (chunk) => controller.enqueue(chunk));
-        stream.on("end", () => controller.close());
-        stream.on("error", (err) => controller.error(err));
-      },
-    });
+    bannerCache = {
+      buffer,
+      contentType,
+      timestamp: Date.now(),
+    };
+    bannerCacheFolderId = folderId;
 
-    return new NextResponse(webStream, {
+    return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",

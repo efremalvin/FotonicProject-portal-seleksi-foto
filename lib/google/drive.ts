@@ -135,10 +135,29 @@ export async function getFolderDetails(rawFolderId: string): Promise<FolderParse
   }
 }
 
+// Cache URL thumbnail Google Drive untuk akses cepat tanpa hit API ulang
+export const driveThumbnailMap = new Map<string, string>();
+
+// In-memory cache daftar foto per folder (TTL 2 menit untuk mencegah multi-request berulang saat loading awal)
+interface CachedFolderPhotos {
+  photos: DrivePhoto[];
+  timestamp: number;
+}
+const folderPhotosCache = new Map<string, CachedFolderPhotos>();
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
 export async function getPhotosFromFolder(
   rawFolderId: string,
 ): Promise<DrivePhoto[]> {
   const folderId = extractFolderId(rawFolderId);
+
+  // 1. Cek In-Memory Cache
+  const cached = folderPhotosCache.get(folderId);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return cached.photos;
+  }
+
   try {
     const query = `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`;
     const response = await driveClient.files.list({
@@ -164,6 +183,10 @@ export async function getPhotosFromFolder(
         }
         const isLandscape = width && height ? width > height : undefined;
 
+        if (file.thumbnailLink) {
+          driveThumbnailMap.set(file.id, file.thumbnailLink);
+        }
+
         validPhotos.push({
           id: file.id,
           name: file.name,
@@ -175,6 +198,11 @@ export async function getPhotosFromFolder(
         });
       }
     }
+
+    folderPhotosCache.set(folderId, {
+      photos: validPhotos,
+      timestamp: now,
+    });
 
     return validPhotos;
   } catch (error) {

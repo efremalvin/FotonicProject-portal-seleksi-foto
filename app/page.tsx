@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/WelcomeModal";
 import HeroBanner from "@/components/HeroBanner";
@@ -12,6 +12,9 @@ import SuccessModal from "@/components/Successmodal";
 import Footer from "@/components/Footer";
 import MasonryGallery from "@/components/MasonryGallery";
 import LoadingScreen from "@/components/LoadingScreen";
+import DraftSavedModal from "@/components/DraftSavedModal";
+import LockedSessionModal from "@/components/LockedSessionModal";
+import PhotoNoteModal from "@/components/PhotoNoteModal";
 import { forceUnlockScroll } from "@/lib/scrollLock";
 
 interface Photo {
@@ -85,11 +88,33 @@ function GalleryContent() {
   const [submittedFileNames, setSubmittedFileNames] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
-  // Modal Lightbox Perbesar Layar Penuh
-  const [previewPhoto, setPreviewPhoto] = useState<{
+  // Catatan khusus per foto (Permintaan #3)
+  const [photoNotes, setPhotoNotes] = useState<Record<string, string>>({});
+  const [activeNoteModalPhoto, setActiveNoteModalPhoto] = useState<{
     id: string;
     name: string;
   } | null>(null);
+
+  // Status Simpan Sementara (Permintaan #1 & #2a)
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showDraftSavedModal, setShowDraftSavedModal] = useState(false);
+  const [showResumeDraftModal, setShowResumeDraftModal] = useState(false);
+  const hasSessionRef = useRef(false);
+
+  // Status Sesi Terkunci Sebelumnya (Permintaan #1 & #2b)
+  const [lockedSessionData, setLockedSessionData] = useState<{
+    waktu: string;
+    clientName: string;
+    count: number;
+    selectedFileNames: string[];
+    matchedIds: string[];
+    notes: string;
+    photoNotes: Record<string, string>;
+  } | null>(null);
+  const [showLockedModal, setShowLockedModal] = useState(false);
+
+  // Fullview Modal dengan Navigasi Index & Zoom Independen (Permintaan #2)
+  const [fullviewIndex, setFullviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!folderId) {
@@ -101,13 +126,52 @@ function GalleryContent() {
       setIsLoading(true);
       setErrorMsg(null);
       try {
-        const res = await fetch(`/api/photos?folder_id=${encodeURIComponent(folderId)}`);
+        // Ambil data foto & status sesi secara PARALEL untuk mempercepat loading awal hingga 50%
+        const [res, sessRes] = await Promise.all([
+          fetch(`/api/photos?folder_id=${encodeURIComponent(folderId)}`),
+          fetch(`/api/session?folder_id=${encodeURIComponent(folderId)}`).catch((e) => {
+            console.warn("Gagal membaca sesi tersimpan:", e);
+            return null;
+          }),
+        ]);
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Gagal mengambil foto.");
 
         setPhotos(data.photos || []);
         if (data.folder) {
           setFolderInfo(data.folder);
+        }
+
+        // Periksa riwayat sesi sebelumnya di Google Sheets (DRAF / TERKUNCI)
+        if (sessRes && sessRes.ok) {
+          try {
+            const sessData = await sessRes.json();
+            if (sessData.hasPreviousSession) {
+              hasSessionRef.current = true;
+              setShowWelcome(false);
+
+              if (sessData.status === "TERKUNCI") {
+                setLockedSessionData(sessData);
+                setShowLockedModal(true);
+                setShowResumeDraftModal(false);
+              } else if (sessData.status === "DRAF") {
+                if (sessData.matchedIds && sessData.matchedIds.length > 0) {
+                  setSelectedIds(sessData.matchedIds);
+                }
+                if (sessData.notes) {
+                  setNotes(sessData.notes);
+                }
+                if (sessData.photoNotes) {
+                  setPhotoNotes(sessData.photoNotes);
+                }
+                setShowResumeDraftModal(true);
+                setShowLockedModal(false);
+              }
+            }
+          } catch (e) {
+            console.warn("Gagal parsing sesi:", e);
+          }
         }
       } catch (err: any) {
         setErrorMsg(err.message || "Gagal memuat foto dari Google Drive.");
@@ -140,6 +204,50 @@ function GalleryContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+
+  // Foto-foto yang sedang terpilih
+  const selectedPhotosList = photos
+    .filter((p) => selectedIds.includes(p.id))
+    .map((p) => ({ id: p.id, name: p.name }));
+
+  const isQuotaFull = selectedIds.length >= maxPhotos;
+
+  const handleOpenPreview = (id: string) => {
+    const activeList = currentView === "preview" ? selectedPhotosList : photos;
+    const idx = activeList.findIndex((p) => p.id === id);
+    setFullviewIndex(idx >= 0 ? idx : 0);
+  };
+
+  const handleSaveDraft = async () => {
+    if (selectedIds.length === 0 || !folderId) return;
+    setIsSavingDraft(true);
+
+    try {
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderId,
+          clientName,
+          max: maxPhotos,
+          selectedFileIds: selectedIds,
+          notes,
+          photoNotes,
+          isDraft: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan sementara.");
+
+      setShowDraftSavedModal(true);
+    } catch (err: any) {
+      alert(`Gagal menyimpan sementara: ${err.message}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (selectedIds.length === 0 || !folderId) return;
     setIsSubmitting(true);
@@ -154,6 +262,8 @@ function GalleryContent() {
           max: maxPhotos,
           selectedFileIds: selectedIds,
           notes,
+          photoNotes,
+          isDraft: false,
         }),
       });
 
@@ -179,12 +289,6 @@ function GalleryContent() {
     window.location.href = `/?folder_id=${encodeURIComponent(cleaned)}`;
   };
 
-  // Foto-foto yang sedang terpilih
-  const selectedPhotosList = photos
-    .filter((p) => selectedIds.includes(p.id))
-    .map((p) => ({ id: p.id, name: p.name }));
-
-  const isQuotaFull = selectedIds.length >= maxPhotos;
 
   // Tampilan 0: Form Masukkan Folder jika folder_id belum ada di URL
   if (!folderId) {
@@ -377,7 +481,8 @@ function GalleryContent() {
             folderDetected={Boolean(folderInfo) || Boolean(errorMsg)}
             clientName={folderInfo?.clientName || urlClient || undefined}
             onCrossfadeStart={() => {
-              if (!hasStarted) {
+              // Hanya tampilkan Selamat Datang untuk pengunjung baru (bukan draf / sesi terkunci)
+              if (!hasStarted && !hasSessionRef.current) {
                 setShowWelcome(true);
               }
             }}
@@ -457,14 +562,17 @@ function GalleryContent() {
                         !selectedIds.includes(photo.id)
                       }
                       onToggle={toggleSelect}
-                      onPreview={(id, name) => setPreviewPhoto({ id, name })}
+                      onPreview={(id) => handleOpenPreview(id)}
+                      width={photo.width}
+                      height={photo.height}
+                      isLandscape={photo.isLandscape}
                     />
                   )}
                 />
               )}
             </div>
 
-            {/* Tombol Mengambang Konfirmasi ke Preview dengan Transisi Halus Emas -> Hijau (Permintaan #5) */}
+            {/* Tombol Mengambang: Simpan Sementara & Lihat Foto Terpilih (Permintaan #1) */}
             {selectedIds.length > 0 && (
               <div
                 style={{
@@ -473,11 +581,49 @@ function GalleryContent() {
                   left: 0,
                   right: 0,
                   display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
+                  gap: "12px",
                   padding: "0 16px",
                   zIndex: 9999,
                   pointerEvents: "none",
+                  flexWrap: "wrap",
                 }}>
+                {/* Tombol 1: Simpan Sementara */}
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={isSavingDraft}
+                  style={{
+                    pointerEvents: "auto",
+                    backgroundColor: "#16161a",
+                    border: "1.5px solid rgba(214, 168, 90, 0.45)",
+                    color: "#f0cf8e",
+                    borderRadius: "9999px",
+                    padding: "13px 22px",
+                    fontSize: "0.88rem",
+                    fontWeight: 700,
+                    cursor: isSavingDraft ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.65)",
+                    backdropFilter: "blur(10px)",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#d6a85a";
+                    e.currentTarget.style.backgroundColor = "#1f1f26";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(214, 168, 90, 0.45)";
+                    e.currentTarget.style.backgroundColor = "#16161a";
+                  }}>
+                  <span>💾</span>
+                  <span>{isSavingDraft ? "Menyimpan..." : "Simpan Sementara"}</span>
+                </button>
+
+                {/* Tombol 2: Lihat Foto Terpilih */}
                 <button
                   onClick={handleGoToPreview}
                   style={{
@@ -575,8 +721,10 @@ function GalleryContent() {
             isSubmitting={isSubmitting}
             onBackToGallery={handleBackToGallery}
             onConfirmSubmit={handleSubmit}
-            onPreview={(id, name) => setPreviewPhoto({ id, name })}
+            onPreview={(id) => handleOpenPreview(id)}
             onToggle={toggleSelect}
+            photoNotes={photoNotes}
+            onOpenNote={(id, name) => setActiveNoteModalPhoto({ id, name })}
           />
         )}
 
@@ -590,14 +738,105 @@ function GalleryContent() {
         />
       )}
 
-        {/* 5. Modal Lightbox Pratinjau Perbesar Layar Penuh */}
-        {previewPhoto && (
+        {/* 5. Modal Fullview dengan Zoom & Panning Independen (Permintaan #2 & #3) */}
+        {fullviewIndex !== null && (
           <PhotoModal
-            id={previewPhoto.id}
-            name={previewPhoto.name}
-            isSelected={selectedIds.includes(previewPhoto.id)}
-            onClose={() => setPreviewPhoto(null)}
+            photos={currentView === "preview" ? selectedPhotosList : photos}
+            currentIndex={fullviewIndex}
+            isOpen={fullviewIndex !== null}
+            onClose={() => setFullviewIndex(null)}
+            onNavigate={(newIdx) => setFullviewIndex(newIdx)}
+            selectedIds={selectedIds}
             onToggle={toggleSelect}
+            photoNotes={photoNotes}
+            onOpenNote={(id, name) => setActiveNoteModalPhoto({ id, name })}
+          />
+        )}
+
+        {/* 6. Modal Catatan Khusus Per Foto (Permintaan #3) */}
+        {activeNoteModalPhoto && (
+          <PhotoNoteModal
+            isOpen={Boolean(activeNoteModalPhoto)}
+            photoName={activeNoteModalPhoto.name}
+            initialNote={photoNotes[activeNoteModalPhoto.id] || ""}
+            onSave={(noteText) => {
+              setPhotoNotes((prev) => ({
+                ...prev,
+                [activeNoteModalPhoto.id]: noteText,
+              }));
+              setActiveNoteModalPhoto(null);
+            }}
+            onClose={() => setActiveNoteModalPhoto(null)}
+          />
+        )}
+
+        {/* 7a. Modal Melanjutkan Pilihan Draf (Permintaan 2a: Kembali ke web setelah simpan sementara) */}
+        {showResumeDraftModal && (
+          <DraftSavedModal
+            clientName={clientName}
+            selectedCount={selectedIds.length}
+            isResume={true}
+            onContinue={() => {
+              setShowResumeDraftModal(false);
+              setHasStarted(true);
+              forceUnlockScroll();
+            }}
+          />
+        )}
+
+        {/* 7b. Modal Konfirmasi Pilihan Baru Saja Disimpan Sementara */}
+        {showDraftSavedModal && (
+          <DraftSavedModal
+            clientName={clientName}
+            selectedCount={selectedIds.length}
+            isResume={false}
+            onContinue={() => {
+              setShowDraftSavedModal(false);
+              forceUnlockScroll();
+            }}
+          />
+        )}
+
+        {/* 8. Modal Konfirmasi Sesi Telah Dikunci Sebelumnya (Permintaan 2b) */}
+        {showLockedModal && lockedSessionData && (
+          <LockedSessionModal
+            clientName={lockedSessionData.clientName || clientName}
+            waktu={lockedSessionData.waktu}
+            count={lockedSessionData.count}
+            selectedFileNames={lockedSessionData.selectedFileNames}
+            notes={lockedSessionData.notes}
+            onUnlockAndEdit={() => {
+              if (lockedSessionData.matchedIds && lockedSessionData.matchedIds.length > 0) {
+                setSelectedIds(lockedSessionData.matchedIds);
+              }
+              if (lockedSessionData.notes) {
+                setNotes(lockedSessionData.notes);
+              }
+              if (lockedSessionData.photoNotes) {
+                setPhotoNotes(lockedSessionData.photoNotes);
+              }
+              setShowWelcome(false);
+              setHasStarted(true);
+              setCurrentView("gallery");
+              setShowLockedModal(false);
+              forceUnlockScroll();
+            }}
+            onViewLocked={() => {
+              if (lockedSessionData.matchedIds && lockedSessionData.matchedIds.length > 0) {
+                setSelectedIds(lockedSessionData.matchedIds);
+              }
+              if (lockedSessionData.notes) {
+                setNotes(lockedSessionData.notes);
+              }
+              if (lockedSessionData.photoNotes) {
+                setPhotoNotes(lockedSessionData.photoNotes);
+              }
+              setShowWelcome(false);
+              setHasStarted(true);
+              setCurrentView("preview");
+              setShowLockedModal(false);
+              forceUnlockScroll();
+            }}
           />
         )}
       </div>

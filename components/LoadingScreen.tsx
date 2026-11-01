@@ -59,10 +59,10 @@ export default function LoadingScreen({
         const removeTimer = setTimeout(() => {
           setShouldRender(false);
           if (onFinished) onFinished();
-        }, 700);
+        }, 450);
 
         return () => clearTimeout(removeTimer);
-      }, 420);
+      }, 180);
 
       return () => clearTimeout(holdTimer);
     }
@@ -83,7 +83,7 @@ export default function LoadingScreen({
         justifyContent: "center",
         padding: "24px",
         opacity: isFadingOut ? 0 : 1,
-        transition: "opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
         pointerEvents: isFadingOut ? "none" : "auto",
       }}>
       {/* Ambient Lighting di Belakang Icon Shutter */}

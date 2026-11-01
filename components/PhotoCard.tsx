@@ -9,6 +9,9 @@ interface PhotoCardProps {
   isDisabled: boolean;
   onToggle: (id: string) => void;
   onPreview: (id: string, name: string) => void;
+  width?: number;
+  height?: number;
+  isLandscape?: boolean;
 }
 
 export default function PhotoCard({
@@ -18,171 +21,164 @@ export default function PhotoCard({
   isDisabled,
   onToggle,
   onPreview,
+  width,
+  height,
+  isLandscape,
 }: PhotoCardProps) {
   const thumbnailUrl = `/api/thumbnail?id=${id}`;
 
+  const handleCardClick = () => {
+    if (isDisabled && !isSelected) return;
+    onToggle(id);
+  };
+
+  // Aspek rasio presisi agar browser langsung mengunci tinggi kartu (Zero Layout Shift saat scroll!)
+  const computedAspectRatio =
+    width && height
+      ? `${width} / ${height}`
+      : isLandscape !== undefined
+      ? isLandscape
+        ? "3 / 2"
+        : "2 / 3"
+      : undefined;
+
   return (
     <div
+      onClick={handleCardClick}
       style={{
-        backgroundColor: "#16161a",
-        borderRadius: "18px",
-        padding: "8px",
-        border: isSelected
-          ? "2px solid #d6a85a"
-          : "1px solid rgba(255, 255, 255, 0.08)",
-        boxShadow: isSelected
-          ? "0 6px 20px rgba(214, 168, 90, 0.28)"
-          : "0 4px 14px rgba(0, 0, 0, 0.45)",
-        transition: "all 0.25s ease",
         position: "relative",
+        width: "100%",
+        borderRadius: "10px",
+        overflow: "hidden",
+        backgroundColor: "#111114",
+        cursor: isDisabled && !isSelected ? "not-allowed" : "pointer",
+        outline: isSelected ? "3px solid #d6a85a" : "1px solid rgba(255, 255, 255, 0.08)",
+        outlineOffset: isSelected ? "-3px" : "0",
+        boxShadow: isSelected
+          ? "0 2px 10px rgba(214, 168, 90, 0.45)"
+          : "0 1px 4px rgba(0, 0, 0, 0.3)",
+        userSelect: "none",
+        aspectRatio: computedAspectRatio,
       }}>
-      {/* Kontainer Foto Menyesuaikan Ukuran (Tidak Crop: Portrait tetap Portrait, Landscape tetap Landscape) */}
-      <div
+      {/* 1. Foto Asli Responsif Sesuai Aspek Rasio (Google Photos Album Tile) */}
+      <img
+        src={thumbnailUrl}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
         style={{
-          position: "relative",
           width: "100%",
-          borderRadius: "12px",
-          overflow: "hidden",
-          backgroundColor: "#0d0d10",
+          height: "100%",
+          display: "block",
+          objectFit: "cover",
+          borderRadius: "10px",
+          filter: isSelected ? "brightness(1.02)" : "brightness(0.96)",
+        }}
+      />
+
+      {/* 2. Overlay Halus saat Foto Terpilih (Google Photos Selection Tint) */}
+      {isSelected && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(214, 168, 90, 0.12)",
+            pointerEvents: "none",
+            borderRadius: "inherit",
+          }}
+        />
+      )}
+
+      {/* 3. Pojok Kiri Atas: Ikon Checklist & Unchecklist Lingkaran (Bebas GPU Blur Lag) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isDisabled && !isSelected) return;
+          onToggle(id);
+        }}
+        title={isSelected ? "Batalkan Pilihan" : "Pilih Foto"}
+        style={{
+          position: "absolute",
+          top: "7px",
+          left: "7px",
+          width: "26px",
+          height: "26px",
+          borderRadius: "50%",
+          backgroundColor: isSelected ? "#d6a85a" : "rgba(18, 18, 22, 0.85)",
+          color: isSelected ? "#09090b" : "transparent",
+          border: isSelected
+            ? "2px solid #d6a85a"
+            : "2px solid rgba(255, 255, 255, 0.85)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          cursor: isDisabled && !isSelected ? "not-allowed" : "pointer",
+          fontSize: "0.82rem",
+          fontWeight: 900,
+          boxShadow: isSelected
+            ? "0 2px 8px rgba(214, 168, 90, 0.6)"
+            : "0 1px 4px rgba(0, 0, 0, 0.4)",
+          zIndex: 10,
         }}>
-        <img
-          src={thumbnailUrl}
-          alt={name}
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
-            objectFit: "contain",
-            borderRadius: "12px",
-          }}
-        />
+        {isSelected ? "✓" : ""}
+      </button>
 
-        {/* Tombol Perbesar / Lightbox */}
-        <button
-          onClick={() => onPreview(id, name)}
-          title="Lihat Pratinjau Penuh"
-          style={{
-            position: "absolute",
-            top: "6px",
-            right: "6px",
-            backgroundColor: "rgba(9, 9, 11, 0.78)",
-            color: "#f0cf8e",
-            border: "1px solid rgba(214, 168, 90, 0.35)",
-            borderRadius: "7px",
-            width: "28px",
-            height: "28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            fontSize: "0.88rem",
-            backdropFilter: "blur(6px)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-            transition: "all 0.2s ease",
-          }}>
-          ⛶
-        </button>
-
-        {/* Badge Terpilih di atas foto */}
-        {isSelected && (
-          <div
-            style={{
-              position: "absolute",
-              top: "6px",
-              left: "6px",
-              backgroundColor: "rgba(9, 9, 11, 0.88)",
-              color: "#f0cf8e",
-              border: "1px solid #d6a85a",
-              borderRadius: "9999px",
-              padding: "2px 8px",
-              fontSize: "0.68rem",
-              fontWeight: 800,
-              display: "flex",
-              alignItems: "center",
-              gap: "3px",
-              backdropFilter: "blur(4px)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-            }}>
-            ✓
-          </div>
-        )}
-      </div>
-
-      {/* Bagian Bawah: Nama File & Tombol Pilih */}
-      <div
+      {/* 4. Pojok Kanan Atas: Tombol Perbesar / Mode Fullview (Bebas GPU Blur Lag) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview(id, name);
+        }}
+        title="Buka Layar Penuh"
         style={{
+          position: "absolute",
+          top: "7px",
+          right: "7px",
+          width: "26px",
+          height: "26px",
+          borderRadius: "50%",
+          backgroundColor: "rgba(18, 18, 22, 0.88)",
+          color: "#f0cf8e",
+          border: "1px solid rgba(214, 168, 90, 0.4)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 4px 4px 4px",
+          justifyContent: "center",
+          cursor: "pointer",
+          fontSize: "0.78rem",
+          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.4)",
+          zIndex: 10,
+        }}>
+        ⛶
+      </button>
+
+      {/* 5. Gradasi Bayangan & Nama Foto di Bawah */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background:
+            "linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.35) 60%, transparent 100%)",
+          padding: "16px 8px 6px 8px",
+          pointerEvents: "none",
+          borderRadius: "0 0 10px 10px",
         }}>
         <span
           title={name}
           style={{
-            fontSize: "0.78rem",
-            fontWeight: 700,
+            fontSize: "0.72rem",
+            fontWeight: 600,
             color: isSelected ? "#f0cf8e" : "#ededed",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            maxWidth: "60%",
+            display: "block",
+            textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
           }}>
           {name}
         </span>
-
-        {isSelected ? (
-          // Tombol Terpilih (Gold Gradient)
-          <button
-            onClick={() => onToggle(id)}
-            style={{
-              background:
-                "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
-              color: "#09090b",
-              border: "none",
-              borderRadius: "9999px",
-              padding: "5px 12px",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              cursor: "pointer",
-              fontSize: "0.74rem",
-              fontWeight: 800,
-              boxShadow: "0 2px 10px rgba(214, 168, 90, 0.4)",
-              transition: "transform 0.15s ease",
-            }}>
-            <span>✓</span>
-            <span>Dipilih</span>
-          </button>
-        ) : (
-          // Tombol Belum Dipilih (Dark Gold Outline Pill)
-          <button
-            onClick={() => onToggle(id)}
-            disabled={isDisabled}
-            style={{
-              backgroundColor: isDisabled
-                ? "rgba(255, 255, 255, 0.04)"
-                : "rgba(214, 168, 90, 0.12)",
-              color: isDisabled ? "#71717a" : "#f0cf8e",
-              border: isDisabled
-                ? "1px solid rgba(255, 255, 255, 0.08)"
-                : "1px solid rgba(214, 168, 90, 0.35)",
-              borderRadius: "9999px",
-              padding: "5px 14px",
-              fontSize: "0.74rem",
-              fontWeight: 700,
-              cursor: isDisabled ? "not-allowed" : "pointer",
-              boxShadow: isDisabled
-                ? "none"
-                : "0 2px 8px rgba(0, 0, 0, 0.3)",
-              transition: "all 0.2s ease",
-            }}>
-            Pilih
-          </button>
-        )}
       </div>
     </div>
   );

@@ -26,22 +26,31 @@
 }
 
 html {
-  scroll-behavior: smooth;
   color-scheme: dark;
 }
 
 body {
   background-color: var(--color-ink);
-  background-image: 
-    radial-gradient(circle 380px at 15% 12%, rgba(214, 168, 90, 0.055), transparent 70%),
-    radial-gradient(circle 420px at 85% 38%, rgba(214, 168, 90, 0.045), transparent 70%),
-    radial-gradient(circle 350px at 15% 68%, rgba(214, 168, 90, 0.04), transparent 70%),
-    radial-gradient(circle 400px at 85% 90%, rgba(214, 168, 90, 0.05), transparent 75%);
-  background-attachment: fixed;
   color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
+  -webkit-overflow-scrolling: touch;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Background Gradien Emas Diisolasi ke Layer GPU Terpisah (Bebas Lag Saat Scroll Mobile - Permintaan #2) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle 480px at 15% 15%, rgba(214, 168, 90, 0.045), transparent 70%),
+    radial-gradient(circle 480px at 85% 75%, rgba(214, 168, 90, 0.038), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+  transform: translateZ(0);
 }
 
 ::selection {
@@ -133,7 +142,7 @@ img {
 /* Tata Letak Galeri: Smart Masonry Tanpa Gap Kosong (Landscape Otomatis Menyesuaikan di Samping Portrait) */
 .gallery-masonry-container {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   width: 100%;
   align-items: flex-start;
 }
@@ -143,30 +152,31 @@ img {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 @media (min-width: 640px) {
   .gallery-masonry-container {
-    gap: 16px;
+    gap: 8px;
   }
   .gallery-masonry-col {
-    gap: 16px;
+    gap: 8px;
   }
 }
 
 @media (min-width: 1024px) {
   .gallery-masonry-container {
-    gap: 20px;
+    gap: 10px;
   }
   .gallery-masonry-col {
-    gap: 20px;
+    gap: 10px;
   }
 }
 
 .photo-masonry-item {
   width: 100%;
   display: block;
+  transform: translateZ(0);
 }
 
 /* Tombol Aksi Halaman Preview: Konsisten, Sempurna di Mobile & Desktop (Tanpa Teks Terpotong / Ikon Tergencet) */
@@ -489,4 +499,9 @@ img {
 
 .shutter-pulse-ring {
   animation: pulseShutterRing 2.4s ease-in-out infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

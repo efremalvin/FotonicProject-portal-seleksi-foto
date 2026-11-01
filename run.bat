@@ -72,7 +72,9 @@ cls
 echo ========================================================
 echo   Menjalankan Next.js Development Server (Port 3000)   
 echo ========================================================
-echo Web dapat diakses di: http://localhost:3000
+echo   - Local   : http://localhost:3000
+echo   - Network : http://192.168.1.11:3000
+echo   - HP Demo : http://192.168.1.11:3000/?folder_id=1-NAhCpCPE6IgEkzqIJalkx4IzIfjVEHk
 echo.
 
 :: Bersihkan cache build jika ada sisa mode build (mencegah Cannot find module ./787.js)
