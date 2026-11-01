@@ -1,6 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, memo } from "react";
+import { IconCalendar } from "./Icons";
+
+function InstagramIcon({ size = 15, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0, display: "inline-block", verticalAlign: "middle" }}>
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="0.9" fill={color} stroke="none" />
+    </svg>
+  );
+}
 
 interface HeroBannerProps {
   clientName: string;
@@ -10,7 +31,7 @@ interface HeroBannerProps {
   bannerPhotoUrl?: string;
 }
 
-export default function HeroBanner({
+function HeroBannerComponent({
   clientName,
   photoDate,
   maxPhotos,
@@ -24,28 +45,26 @@ export default function HeroBanner({
   // Titik fokus vertikal dalam persen (default 72% untuk mengangkat wajah subjek ke area tengah yang bebas teks)
   const [focalY, setFocalY] = useState<number>(72);
 
-  // Otomatis Deteksi Wajah & Subjek Klien Menggunakan Model YCbCr Presisi (Menolak Cat Merah Bangunan)
-  useEffect(() => {
-    if (!bannerSrc) return;
+  // Otomatis Deteksi Wajah & Subjek Klien Langsung dari Elemen Gambar Tanpa Download Ganda & Tanpa Blokir Main Thread
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      // Pada desktop, gambar hero mobile disembunyikan sehingga tidak perlu pemindaian kanvas
+      return;
+    }
 
-    let isMounted = true;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = bannerSrc;
+    const img = e.currentTarget;
+    if (!img || !img.naturalWidth || !img.naturalHeight) return;
 
-    img.onload = async () => {
-      if (!isMounted) return;
-
+    const runDetection = async () => {
       // Metode 1: Browser Native FaceDetector API (Jika diaktifkan di Chromium / Android)
       if (typeof window !== "undefined" && "FaceDetector" in window) {
         try {
           // @ts-ignore
           const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
           const faces = await detector.detect(img);
-          if (faces && faces.length > 0 && isMounted) {
+          if (faces && faces.length > 0) {
             const face = faces[0].boundingBox;
             const faceCenterY = ((face.top + face.height * 0.5) / img.naturalHeight) * 100;
-            // Angkat subjek agar wajah tampil di jendela tengah atas hero banner (sekitar 38% viewport)
             const targetY = Math.max(55, Math.min(88, Math.round(faceCenterY * 1.35)));
             setFocalY(targetY);
             return;
@@ -55,25 +74,23 @@ export default function HeroBanner({
         }
       }
 
-      // Metode 2: In-Memory Canvas YCbCr Skin Chrominance Scanner (Akurat & Menolak Warna Atap Bangunan)
+      // Metode 2: In-Memory Canvas YCbCr Skin Chrominance Scanner Ringan (Sample 64px)
       try {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) return;
 
-        const sampleW = 100;
-        const sampleH = Math.max(50, Math.round((sampleW * img.naturalHeight) / img.naturalWidth));
+        const sampleW = 64;
+        const sampleH = Math.max(36, Math.round((sampleW * img.naturalHeight) / img.naturalWidth));
         canvas.width = sampleW;
         canvas.height = sampleH;
         ctx.drawImage(img, 0, 0, sampleW, sampleH);
 
-        const imgData = ctx.getImageData(0, 0, sampleW, sampleH);
-        const data = imgData.data;
+        const data = ctx.getImageData(0, 0, sampleW, sampleH).data;
 
         let totalWeight = 0;
         let weightedY = 0;
 
-        // Fokus pemindaian pada zona potret manusia (20% - 80% tinggi foto)
         const scanStartY = Math.floor(sampleH * 0.2);
         const scanEndY = Math.floor(sampleH * 0.82);
 
@@ -84,21 +101,11 @@ export default function HeroBanner({
             const g = data[idx + 1];
             const b = data[idx + 2];
 
-            // Model Standar YCbCr: Kulit manusia memiliki rentang Cr [135, 178] dan Cb [88, 135].
-            // Cat merah atap/gedung memiliki Cr > 185 sehingga otomatis ditolak!
             const Y = 0.299 * r + 0.587 * g + 0.114 * b;
             const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
             const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-            const isSkin =
-              Cr >= 135 &&
-              Cr <= 178 &&
-              Cb >= 88 &&
-              Cb <= 135 &&
-              Y > 45 &&
-              Y < 235;
-
-            if (isSkin) {
+            if (Cr >= 135 && Cr <= 178 && Cb >= 88 && Cb <= 135 && Y > 45 && Y < 235) {
               const distFromCenterX = Math.abs(x - sampleW / 2) / (sampleW / 2);
               const weight = Math.max(0.4, 1 - distFromCenterX);
               totalWeight += weight;
@@ -107,25 +114,24 @@ export default function HeroBanner({
           }
         }
 
-        if (totalWeight > 25 && isMounted) {
+        if (totalWeight > 12) {
           const detectedPercent = (weightedY / totalWeight / sampleH) * 100;
-          // Posisikan wajah subjek agar berada di area aman tengah tanpa tertutup teks bawah
           const targetY = Math.max(60, Math.min(88, Math.round(detectedPercent * 1.3)));
           setFocalY(targetY);
-        } else if (isMounted) {
-          // Default optimal untuk foto wisuda/portrait
+        } else {
           setFocalY(74);
         }
       } catch {
-        // Fallback default
-        if (isMounted) setFocalY(74);
+        setFocalY(74);
       }
     };
 
-    return () => {
-      isMounted = false;
-    };
-  }, [bannerSrc]);
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(runDetection, { timeout: 600 });
+    } else {
+      setTimeout(runDetection, 120);
+    }
+  }, []);
 
   return (
     <div style={{ width: "100%", position: "relative" }}>
@@ -147,13 +153,14 @@ export default function HeroBanner({
           borderBottom: "1.5px solid rgba(214, 168, 90, 0.35)",
           boxShadow: "0 16px 40px rgba(0, 0, 0, 0.8)",
           backgroundColor: "#09090b",
-          isolation: "isolate",
-          WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+          contain: "layout style paint",
         }}>
         {/* Gambar Banner Klien dengan Auto-Focal Point Centering */}
         <img
           src={bannerSrc}
           alt={clientName}
+          decoding="async"
+          onLoad={handleImageLoad}
           style={{
             position: "absolute",
             inset: 0,
@@ -260,14 +267,13 @@ export default function HeroBanner({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                backgroundColor: "rgba(9, 9, 11, 0.85)",
+                backgroundColor: "rgba(9, 9, 11, 0.9)",
                 border: "1px solid rgba(214, 168, 90, 0.35)",
                 padding: "4px 14px",
                 borderRadius: "9999px",
-                backdropFilter: "blur(10px)",
                 boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
               }}>
-              <span>🗓️</span>
+              <IconCalendar size={15} color="#d6a85a" />
               <span>{photoDate}</span>
               {maxPhotos && (
                 <>
@@ -278,7 +284,7 @@ export default function HeroBanner({
             </div>
           )}
 
-          {/* Link Instagram */}
+          {/* Link Instagram Mobile: Selalu Tetap Abu-abu (#a1a1aa) */}
           <a
             href="https://instagram.com/fotonicproject"
             target="_blank"
@@ -286,40 +292,19 @@ export default function HeroBanner({
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "8px",
-              backgroundColor: "rgba(9, 9, 11, 0.85)",
-              border: "1px solid rgba(214, 168, 90, 0.35)",
-              borderRadius: "9999px",
-              padding: "4px 16px",
+              justifyContent: "center",
+              gap: "6px",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              color: "#a1a1aa",
               textDecoration: "none",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+              padding: "4px 14px",
+              borderRadius: "9999px",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              backgroundColor: "rgba(18, 18, 22, 0.85)",
             }}>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#d6a85a"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ display: "block" }}>
-              <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-              <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-            </svg>
-            <span
-              style={{
-                fontFamily: "'Tangerine', cursive, serif",
-                fontSize: "1.35rem",
-                fontWeight: 700,
-                color: "#f0cf8e",
-                lineHeight: 1,
-                letterSpacing: "0.5px",
-              }}>
-              @fotonicproject
-            </span>
+            <InstagramIcon size={14} color="#a1a1aa" />
+            <span style={{ color: "#a1a1aa" }}>@fotonicproject</span>
           </a>
         </div>
       </div>
@@ -388,7 +373,7 @@ export default function HeroBanner({
                 padding: "4px 14px",
                 borderRadius: "9999px",
               }}>
-              <span>🗓️</span>
+              <IconCalendar size={16} color="#d6a85a" />
               <span>{photoDate}</span>
               {maxPhotos && (
                 <>
@@ -406,18 +391,27 @@ export default function HeroBanner({
             style={{
               display: "inline-flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "6px",
               fontSize: "0.82rem",
               fontWeight: 600,
               color: "#a1a1aa",
               textDecoration: "none",
-              padding: "4px 12px",
+              padding: "4px 14px",
               borderRadius: "9999px",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              transition: "color 0.2s ease",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              backgroundColor: "rgba(18, 18, 22, 0.85)",
+              transition: "color 0.2s ease, border-color 0.2s ease, transform 0.15s ease",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#f0cf8e")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#a1a1aa")}>
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#ffffff";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#a1a1aa";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)";
+            }}>
+            <InstagramIcon size={14} color="currentColor" />
             <span>@fotonicproject</span>
           </a>
         </div>
@@ -425,3 +419,6 @@ export default function HeroBanner({
     </div>
   );
 }
+
+const HeroBanner = memo(HeroBannerComponent);
+export default HeroBanner;

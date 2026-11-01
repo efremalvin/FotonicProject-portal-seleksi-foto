@@ -44,9 +44,9 @@ export default function DraftSavedModal({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(9, 9, 11, 0.88)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
+        backgroundColor: "rgba(9, 9, 11, 0.92)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         zIndex: 999995,
         display: "flex",
         alignItems: "center",

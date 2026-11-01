@@ -1,15 +1,270 @@
 "use client";
 
-import React from "react";
+import React, { memo, useCallback } from "react";
 import MasonryGallery from "./MasonryGallery";
+import { IconPaper, IconPaperPlus, IconCalendar, IconImage } from "./Icons";
 
-interface SelectedPhoto {
+export interface SelectedPhoto {
   id: string;
   name: string;
   width?: number;
   height?: number;
   isLandscape?: boolean;
 }
+
+interface PreviewCardItemProps {
+  photo: SelectedPhoto;
+  noteText?: string;
+  onPreview: (id: string, name: string) => void;
+  onToggle?: (id: string) => void;
+  onOpenNote?: (id: string, name: string) => void;
+}
+
+const PreviewCardItem = memo(function PreviewCardItem({
+  photo,
+  noteText,
+  onPreview,
+  onToggle,
+  onOpenNote,
+}: PreviewCardItemProps) {
+  const computedAspectRatio =
+    photo.width && photo.height
+      ? `${photo.width} / ${photo.height}`
+      : photo.isLandscape !== undefined
+      ? photo.isLandscape
+        ? "3 / 2"
+        : "2 / 3"
+      : undefined;
+
+  return (
+    <div
+      style={{
+        backgroundColor: "#16161a",
+        borderRadius: "20px",
+        padding: "10px",
+        border: "2px solid #d6a85a",
+        boxShadow: "0 2px 12px rgba(214, 168, 90, 0.22)",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        contain: "layout style paint",
+      }}>
+      {/* Foto Thumbnail (Klik Foto atau Tombol Expand untuk Buka Fullview) */}
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview(photo.id, photo.name);
+        }}
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: computedAspectRatio,
+          borderRadius: "14px",
+          overflow: "hidden",
+          backgroundColor: "#0d0d10",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+        }}>
+        <img
+          src={`/api/thumbnail?id=${photo.id}`}
+          alt={photo.name}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            display: "block",
+            borderRadius: "14px",
+          }}
+        />
+
+        {/* Badge Centang Emas di Kiri Atas Foto (Ukuran Ringkas agar Tidak Menutupi Foto - Permintaan 2.a) */}
+        <div
+          style={{
+            position: "absolute",
+            top: "6px",
+            left: "6px",
+            backgroundColor: "#d6a85a",
+            color: "#09090b",
+            borderRadius: "50%",
+            width: "20px",
+            height: "20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "0.72rem",
+            fontWeight: 800,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+            zIndex: 2,
+          }}>
+          ✓
+        </div>
+
+        {/* Tombol Perbesar Pratinjau (Ukuran Ringkas - Permintaan 2.a) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(photo.id, photo.name);
+          }}
+          title="Lihat Pratinjau Penuh"
+          style={{
+            position: "absolute",
+            top: "6px",
+            right: "6px",
+            backgroundColor: "rgba(18, 18, 22, 0.88)",
+            color: "#f0cf8e",
+            border: "1px solid rgba(214, 168, 90, 0.4)",
+            borderRadius: "6px",
+            width: "22px",
+            height: "22px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: "0.75rem",
+            zIndex: 2,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+          }}>
+          ⛶
+        </button>
+      </div>
+
+      {/* 1. Baris Nama File (Jelas, Tidak Tertutup Apapun - Permintaan 2.b) */}
+      <div style={{ padding: "8px 2px 2px 2px", width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "6px" }}>
+        <IconImage size={15} color="#d6a85a" />
+        <span
+          title={photo.name}
+          style={{
+            fontSize: "0.82rem",
+            fontWeight: 700,
+            color: "#ffffff",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "block",
+            width: "100%",
+          }}>
+          {photo.name}
+        </span>
+      </div>
+
+      {/* 2. Catatan Independen di Bawah Nama File (Teks Sedikit + Titik-Titik Sesuai Lebar UI - Permintaan 2.b) */}
+      <div style={{ width: "100%", marginTop: "4px" }}>
+        {noteText ? (
+          <button
+            onClick={() => onOpenNote && onOpenNote(photo.id, photo.name)}
+            title={`Catatan Khusus: "${noteText}" (Klik untuk edit)`}
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(214, 168, 90, 0.12)",
+              border: "1px solid rgba(214, 168, 90, 0.35)",
+              borderRadius: "8px",
+              padding: "5px 8px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer",
+              textAlign: "left",
+              boxSizing: "border-box",
+            }}>
+            <IconPaper size={15} color="#f0cf8e" />
+            <span
+              style={{
+                fontSize: "0.72rem",
+                color: "#f0cf8e",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                flex: 1,
+                minWidth: 0,
+              }}>
+              {noteText}
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onOpenNote && onOpenNote(photo.id, photo.name)}
+            title="Tambah catatan khusus untuk foto ini"
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(255, 255, 255, 0.03)",
+              border: "1px dashed rgba(255, 255, 255, 0.16)",
+              borderRadius: "8px",
+              padding: "4px 8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
+              color: "#a1a1aa",
+              fontSize: "0.7rem",
+              cursor: "pointer",
+              boxSizing: "border-box",
+            }}>
+            <IconPaperPlus size={15} color="#d6a85a" />
+            <span>Catatan Khusus</span>
+          </button>
+        )}
+      </div>
+
+      {/* 3. Tombol Terpilih di Bawah Catatan Independen (Permintaan 2.c) */}
+      <div style={{ marginTop: "8px", width: "100%" }}>
+        {onToggle ? (
+          <button
+            onClick={() => onToggle(photo.id)}
+            title="Klik untuk membatalkan / mengubah pilihan foto ini"
+            style={{
+              width: "100%",
+              background:
+                "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+              color: "#09090b",
+              border: "none",
+              borderRadius: "9999px",
+              padding: "6px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "5px",
+              cursor: "pointer",
+              fontSize: "0.76rem",
+              fontWeight: 800,
+              boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
+              whiteSpace: "nowrap",
+              boxSizing: "border-box",
+            }}>
+            <span>✓</span>
+            <span>Terpilih</span>
+          </button>
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              background:
+                "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+              color: "#09090b",
+              borderRadius: "9999px",
+              padding: "6px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "5px",
+              fontSize: "0.76rem",
+              fontWeight: 800,
+              boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
+              whiteSpace: "nowrap",
+              boxSizing: "border-box",
+            }}>
+            <span>✓</span>
+            <span>Terpilih</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 interface PreviewViewProps {
   clientName: string;
@@ -42,6 +297,19 @@ export default function PreviewView({
   photoNotes = {},
   onOpenNote,
 }: PreviewViewProps) {
+  const renderCard = useCallback(
+    (photo: any) => (
+      <PreviewCardItem
+        photo={photo}
+        noteText={photoNotes[photo.id]}
+        onPreview={onPreview}
+        onToggle={onToggle}
+        onOpenNote={onOpenNote}
+      />
+    ),
+    [photoNotes, onPreview, onToggle, onOpenNote]
+  );
+
   return (
     <div
       style={{
@@ -82,7 +350,7 @@ export default function PreviewView({
               color: "#a1a1aa",
               marginBottom: "8px",
             }}>
-            🗓️ Tanggal Sesi: <strong style={{ color: "#f0cf8e" }}>{photoDate}</strong>
+            <IconCalendar size={15} color="#d6a85a" style={{ marginRight: 6, verticalAlign: -2 }} /> Tanggal Sesi: <strong style={{ color: "#f0cf8e" }}>{photoDate}</strong>
           </div>
         )}
 
@@ -109,236 +377,39 @@ export default function PreviewView({
         </div>
       </div>
 
-      {/* Grid Galeri Foto Terpilih (Smart Masonry Tanpa Gap Kosong) */}
+      {/* Grid Galeri Foto Terpilih (Smart Masonry Tanpa Gap Kosong & Terisolasi dari Re-render Textarea) */}
       <div style={{ marginBottom: "32px" }}>
-        <MasonryGallery
-          photos={selectedPhotos as any}
-          renderItem={(photo) => (
-            <div
+        {selectedPhotos.length === 0 ? (
+          <div
+            style={{
+              padding: "48px 20px",
+              textAlign: "center",
+              backgroundColor: "#16161a",
+              borderRadius: "16px",
+              border: "1px dashed rgba(214, 168, 90, 0.3)",
+              color: "#a1a1aa",
+            }}>
+            <p style={{ margin: "0 0 16px 0", fontSize: "0.95rem" }}>
+              Belum ada foto yang dipilih. Silakan kembali ke galeri untuk memilih foto.
+            </p>
+            <button
+              onClick={onBackToGallery}
               style={{
-                backgroundColor: "#16161a",
-                borderRadius: "20px",
-                padding: "10px",
-                border: "2px solid #d6a85a",
-                boxShadow: "0 2px 12px rgba(214, 168, 90, 0.22)",
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
+                backgroundColor: "rgba(214, 168, 90, 0.15)",
+                color: "#f0cf8e",
+                border: "1px solid rgba(214, 168, 90, 0.35)",
+                padding: "8px 20px",
+                borderRadius: "9999px",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "0.85rem",
               }}>
-              {/* Foto Thumbnail (Klik Foto atau Tombol Expand untuk Buka Fullview) */}
-              <div
-                onClick={(e) => { e.stopPropagation(); onPreview(photo.id, photo.name); }}
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                  backgroundColor: "#0d0d10",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}>
-                <img
-                  src={`/api/thumbnail?id=${photo.id}`}
-                  alt={photo.name}
-                  loading="lazy"
-                  decoding="async"
-                  style={{
-                    width: "100%",
-                    height: "auto",
-                    objectFit: "contain",
-                    display: "block",
-                    borderRadius: "14px",
-                  }}
-                />
-
-                {/* Badge Centang Emas di Kiri Atas Foto (Ukuran Ringkas agar Tidak Menutupi Foto - Permintaan 2.a) */}
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "6px",
-                    left: "6px",
-                    backgroundColor: "#d6a85a",
-                    color: "#09090b",
-                    borderRadius: "50%",
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.72rem",
-                    fontWeight: 800,
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
-                    zIndex: 2,
-                  }}>
-                  ✓
-                </div>
-
-                {/* Tombol Perbesar Pratinjau (Ukuran Ringkas - Permintaan 2.a) */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPreview(photo.id, photo.name);
-                  }}
-                  title="Lihat Pratinjau Penuh"
-                  style={{
-                    position: "absolute",
-                    top: "6px",
-                    right: "6px",
-                    backgroundColor: "rgba(18, 18, 22, 0.88)",
-                    color: "#f0cf8e",
-                    border: "1px solid rgba(214, 168, 90, 0.4)",
-                    borderRadius: "6px",
-                    width: "22px",
-                    height: "22px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    fontSize: "0.75rem",
-                    zIndex: 2,
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
-                  }}>
-                  ⛶
-                </button>
-              </div>
-
-              {/* 1. Baris Nama File (Jelas, Tidak Tertutup Apapun - Permintaan 2.b) */}
-              <div style={{ padding: "8px 2px 2px 2px", width: "100%", boxSizing: "border-box" }}>
-                <span
-                  title={photo.name}
-                  style={{
-                    fontSize: "0.82rem",
-                    fontWeight: 700,
-                    color: "#ffffff",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "block",
-                    width: "100%",
-                  }}>
-                  {photo.name}
-                </span>
-              </div>
-
-              {/* 2. Catatan Independen di Bawah Nama File (Teks Sedikit + Titik-Titik Sesuai Lebar UI - Permintaan 2.b) */}
-              <div style={{ width: "100%", marginTop: "4px" }}>
-                {photoNotes && photoNotes[photo.id] ? (
-                  <button
-                    onClick={() => onOpenNote && onOpenNote(photo.id, photo.name)}
-                    title={`Catatan Khusus: "${photoNotes[photo.id]}" (Klik untuk edit)`}
-                    style={{
-                      width: "100%",
-                      backgroundColor: "rgba(214, 168, 90, 0.12)",
-                      border: "1px solid rgba(214, 168, 90, 0.35)",
-                      borderRadius: "8px",
-                      padding: "5px 8px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      boxSizing: "border-box",
-                      transition: "all 0.15s ease",
-                    }}>
-                    <span style={{ fontSize: "0.74rem", flexShrink: 0 }}>📝</span>
-                    <span
-                      style={{
-                        fontSize: "0.72rem",
-                        color: "#f0cf8e",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        flex: 1,
-                        minWidth: 0,
-                      }}>
-                      {photoNotes[photo.id]}
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onOpenNote && onOpenNote(photo.id, photo.name)}
-                    title="Tambah catatan khusus untuk foto ini"
-                    style={{
-                      width: "100%",
-                      backgroundColor: "rgba(255, 255, 255, 0.03)",
-                      border: "1px dashed rgba(255, 255, 255, 0.16)",
-                      borderRadius: "8px",
-                      padding: "4px 8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "4px",
-                      color: "#a1a1aa",
-                      fontSize: "0.7rem",
-                      cursor: "pointer",
-                      boxSizing: "border-box",
-                      transition: "all 0.15s ease",
-                    }}>
-                    <span style={{ color: "#d6a85a", fontSize: "0.75rem" }}>+</span>
-                    <span>Catatan Khusus</span>
-                  </button>
-                )}
-              </div>
-
-              {/* 3. Tombol Terpilih di Bawah Catatan Independen (Permintaan 2.c) */}
-              <div style={{ marginTop: "8px", width: "100%" }}>
-                {onToggle ? (
-                  <button
-                    onClick={() => onToggle(photo.id)}
-                    title="Klik untuk membatalkan / mengubah pilihan foto ini"
-                    style={{
-                      width: "100%",
-                      background:
-                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
-                      color: "#09090b",
-                      border: "none",
-                      borderRadius: "9999px",
-                      padding: "6px 12px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "5px",
-                      cursor: "pointer",
-                      fontSize: "0.76rem",
-                      fontWeight: 800,
-                      boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
-                      whiteSpace: "nowrap",
-                      boxSizing: "border-box",
-                      transition: "transform 0.15s ease",
-                    }}>
-                    <span>✓</span>
-                    <span>Terpilih</span>
-                  </button>
-                ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      background:
-                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
-                      color: "#09090b",
-                      borderRadius: "9999px",
-                      padding: "6px 12px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "5px",
-                      fontSize: "0.76rem",
-                      fontWeight: 800,
-                      boxShadow: "0 2px 8px rgba(214, 168, 90, 0.35)",
-                      whiteSpace: "nowrap",
-                      boxSizing: "border-box",
-                    }}>
-                    <span>✓</span>
-                    <span>Terpilih</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        />
+              ← Kembali ke Galeri
+            </button>
+          </div>
+        ) : (
+          <MasonryGallery photos={selectedPhotos as any} renderItem={renderCard} />
+        )}
       </div>
 
       {/* Kotak Catatan Tambahan (Opsional) */}
@@ -360,7 +431,7 @@ export default function PreviewView({
             color: "#ffffff",
             marginBottom: "8px",
           }}>
-          📝 Catatan Tambahan untuk Editor (Opsional):
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><IconPaper size={18} color="#d6a85a" /><span>Catatan Tambahan untuk Editor (Opsional):</span></span>
         </label>
         <textarea
           id="edit-notes"

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { IconLocation } from "./Icons";
 
 /**
  * Ikon WhatsApp persis seperti Web-Porto (Outline bubble hijau dengan gagang telepon di dalam)
@@ -64,8 +65,8 @@ export default function Footer() {
               <span className="footer-brand-subtitle">PHOTO &amp; VIDEO PROJECT</span>
             </a>
             <p className="footer-quote">&ldquo;Capture your moment and tell your story&rdquo;</p>
-            <p className="footer-location">
-              <span style={{ fontSize: "0.85rem", marginRight: "2px" }}>📍</span>
+            <p className="footer-location" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <IconLocation size={16} color="#d6a85a" style={{ flexShrink: 0 }} />
               <span>Bandar Lampung &amp; Sekitarnya</span>
             </p>
           </div>

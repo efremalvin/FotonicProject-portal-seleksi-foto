@@ -1,13 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
 
 interface ProgressBarProps {
   current: number;
   max: number;
 }
 
-export default function ProgressBar({ current, max }: ProgressBarProps) {
+function ProgressBarComponent({ current, max }: ProgressBarProps) {
   const isFull = current >= max;
   const percentage = Math.min((current / max) * 100, 100);
 
@@ -20,9 +20,10 @@ export default function ProgressBar({ current, max }: ProgressBarProps) {
         margin: "0 auto 20px auto",
         maxWidth: "500px",
         width: "calc(100% - 24px)",
-        backgroundColor: "rgba(9, 9, 11, 0.95)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
+        backgroundColor: "rgba(9, 9, 11, 0.96)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        transform: "translateZ(0)",
         borderRadius: "9999px",
         padding: "8px 14px",
         display: "flex",
@@ -51,7 +52,7 @@ export default function ProgressBar({ current, max }: ProgressBarProps) {
               ? "linear-gradient(90deg, #b9853a, #d6a85a 60%, #f0cf8e 100%)"
               : "#27272a",
             borderRadius: "9999px",
-            transition: "width 0.35s ease, background 0.35s ease",
+            transition: "width 0.3s ease",
             boxShadow: isFull
               ? "0 0 10px rgba(34, 197, 94, 0.5)"
               : current > 0
@@ -94,3 +95,6 @@ export default function ProgressBar({ current, max }: ProgressBarProps) {
     </div>
   );
 }
+
+const ProgressBar = memo(ProgressBarComponent);
+export default ProgressBar;

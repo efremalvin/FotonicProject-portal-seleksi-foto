@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [photos, folder] = await Promise.all([
+    const [photosData, folder] = await Promise.all([
       getPhotosFromFolder(folderId),
       getFolderDetails(folderId),
     ]);
@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       folder,
-      photos,
+      photos: photosData,
+      hasSubfolders: (photosData as any).hasSubfolders || false,
+      sections: (photosData as any).sections || [],
     });
   } catch (error: any) {
     return NextResponse.json(

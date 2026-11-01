@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { IconPaper, IconImage } from "./Icons";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 
 interface PhotoNoteModalProps {
@@ -85,7 +86,7 @@ export default function PhotoNoteModal({
         {/* Header Modal Catatan */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "1.2rem" }}>📝</span>
+            <IconPaper size={20} color="#d6a85a" style={{ flexShrink: 0 }} />
             <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
               Catatan Khusus Foto
             </h3>
@@ -116,15 +117,25 @@ export default function PhotoNoteModal({
             fontWeight: 700,
             color: "#f0cf8e",
             backgroundColor: "#0d0d10",
-            padding: "8px 12px",
+            padding: "8px 14px",
             borderRadius: "10px",
             marginBottom: "16px",
             border: "1px solid rgba(214, 168, 90, 0.2)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            minWidth: 0,
           }}>
-          📸 {photoName}
+          <IconImage size={18} color="#d6a85a" style={{ flexShrink: 0 }} />
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              lineHeight: 1.2,
+            }}>
+            {photoName}
+          </span>
         </div>
 
         {/* Instruksi Ringkas */}

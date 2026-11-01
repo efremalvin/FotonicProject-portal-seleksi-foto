@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { IconPaper, IconImage } from "./Icons";
 import { lockScroll, unlockScroll, forceUnlockScroll } from "@/lib/scrollLock";
 
 interface LockedSessionModalProps {
@@ -50,9 +51,9 @@ export default function LockedSessionModal({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(9, 9, 11, 0.92)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
+        backgroundColor: "rgba(9, 9, 11, 0.94)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         zIndex: 999995,
         display: "flex",
         alignItems: "center",
@@ -140,7 +141,7 @@ export default function LockedSessionModal({
             <span style={{ color: "#ededed", fontWeight: 600 }}>{waktu || "-"}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ color: "#a1a1aa" }}>📸 Jumlah Terkunci:</span>
+            <span style={{ color: "#a1a1aa", display: "inline-flex", alignItems: "center", gap: "6px" }}><IconImage size={15} color="#d6a85a" /><span>Jumlah Terkunci:</span></span>
             <span style={{ color: "#f0cf8e", fontWeight: 700 }}>{count} Foto</span>
           </div>
 
@@ -148,7 +149,7 @@ export default function LockedSessionModal({
           {notes && notes !== "-" && (
             <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <span style={{ color: "#d6a85a", fontWeight: 700, display: "block", marginBottom: "2px" }}>
-                📝 Catatan Sebelumnya:
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><IconPaper size={15} color="#d6a85a" /><span>Catatan Sebelumnya:</span></span>
               </span>
               <p style={{ color: "#d4d4d8", fontSize: "0.78rem", margin: 0, whiteSpace: "pre-wrap", maxHeight: "60px", overflowY: "auto" }}>
                 {notes}

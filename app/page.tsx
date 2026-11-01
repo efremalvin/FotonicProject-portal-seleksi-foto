@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState, useRef } from "react";
+import React, { Suspense, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import WelcomeModal from "@/components/WelcomeModal";
 import HeroBanner from "@/components/HeroBanner";
@@ -25,6 +25,14 @@ interface Photo {
   width?: number;
   height?: number;
   isLandscape?: boolean;
+  folderId?: string;
+  folderName?: string;
+}
+
+interface FolderSection {
+  id: string;
+  title: string;
+  count: number;
 }
 
 interface FolderInfo {
@@ -74,6 +82,8 @@ function GalleryContent() {
       : folderInfo?.maxPhotos || 15;
 
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [hasSubfolders, setHasSubfolders] = useState<boolean>(false);
+  const [sections, setSections] = useState<FolderSection[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -139,6 +149,8 @@ function GalleryContent() {
         if (!res.ok) throw new Error(data.error || "Gagal mengambil foto.");
 
         setPhotos(data.photos || []);
+        setHasSubfolders(Boolean(data.hasSubfolders));
+        setSections(data.sections || []);
         if (data.folder) {
           setFolderInfo(data.folder);
         }
@@ -183,40 +195,182 @@ function GalleryContent() {
     fetchPhotos();
   }, [folderId]);
 
-  const toggleSelect = (id: string) => {
+  // Set pencarian O(1) super cepat agar memilih foto tidak melakukan linear scan O(N) ke ratusan kartu
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const isQuotaFull = selectedIds.length >= maxPhotos;
+
+  const maxPhotosRef = useRef(maxPhotos);
+  maxPhotosRef.current = maxPhotos;
+
+  // Sistem Riwayat Navigasi Tombol Kembali (Back Button HP) Tanpa Reload / Keluar Web
+  const ignoreNextPopStateRef = useRef(false);
+  const navStateRef = useRef({
+    currentView,
+    fullviewIndex,
+    activeNoteModalPhoto,
+    showDraftSavedModal,
+  });
+  navStateRef.current = {
+    currentView,
+    fullviewIndex,
+    activeNoteModalPhoto,
+    showDraftSavedModal,
+  };
+
+  const pushNavLayer = useCallback((layer: string) => {
+    if (typeof window !== "undefined") {
+      window.history.pushState({ fotonicLayer: layer }, "");
+    }
+  }, []);
+
+  const popNavLayerSilently = useCallback((expectedLayer: string) => {
+    if (
+      typeof window !== "undefined" &&
+      window.history.state &&
+      window.history.state.fotonicLayer === expectedLayer
+    ) {
+      ignoreNextPopStateRef.current = true;
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (ignoreNextPopStateRef.current) {
+        ignoreNextPopStateRef.current = false;
+        return;
+      }
+
+      const nav = navStateRef.current;
+      if (nav.activeNoteModalPhoto !== null) {
+        setActiveNoteModalPhoto(null);
+      } else if (nav.fullviewIndex !== null) {
+        setFullviewIndex(null);
+      } else if (nav.showDraftSavedModal) {
+        setShowDraftSavedModal(false);
+        forceUnlockScroll();
+      } else if (nav.currentView === "preview") {
+        setCurrentView("gallery");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       if (prev.includes(id)) {
         return prev.filter((item) => item !== id);
       } else {
-        if (prev.length >= maxPhotos) return prev;
+        if (prev.length >= maxPhotosRef.current) return prev;
         return [...prev, id];
       }
     });
-  };
+  }, []);
 
-  const handleGoToPreview = () => {
+  const handleGoToPreview = useCallback(() => {
+    pushNavLayer("preview");
     setCurrentView("preview");
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, [pushNavLayer]);
 
-  const handleBackToGallery = () => {
+  const handleBackToGallery = useCallback(() => {
     setCurrentView("gallery");
+    setFullviewIndex(null);
+    setActiveNoteModalPhoto(null);
+    forceUnlockScroll();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+    popNavLayerSilently("preview");
+  }, [popNavLayerSilently]);
 
+  // Foto-foto yang sedang terpilih (dimemoisasi + mempertahankan dimensi agar tidak re-render saat mengetik catatan)
+  const selectedPhotosList = useMemo(
+    () =>
+      photos
+        .filter((p) => selectedSet.has(p.id))
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          width: p.width,
+          height: p.height,
+          isLandscape: p.isLandscape,
+        })),
+    [photos, selectedSet]
+  );
 
-  // Foto-foto yang sedang terpilih
-  const selectedPhotosList = photos
-    .filter((p) => selectedIds.includes(p.id))
-    .map((p) => ({ id: p.id, name: p.name }));
+  // Memoisasi pengelompokan foto per subfolder agar tidak di-filter ulang setiap kali klik pilih foto
+  const sectionsWithPhotos = useMemo(() => {
+    if (!hasSubfolders || sections.length === 0) return [];
+    return sections
+      .map((sec) => ({
+        ...sec,
+        secPhotos: photos.filter(
+          (p) => p.folderId === sec.id || p.folderName === sec.title
+        ),
+      }))
+      .filter((sec) => sec.secPhotos.length > 0);
+  }, [hasSubfolders, sections, photos]);
 
-  const isQuotaFull = selectedIds.length >= maxPhotos;
+  // Ref stabil untuk handleOpenPreview agar referensi fungsi tidak berubah-ubah
+  const previewStateRef = useRef({ currentView, selectedPhotosList, photos, fullviewIndex });
+  previewStateRef.current = { currentView, selectedPhotosList, photos, fullviewIndex };
 
-  const handleOpenPreview = (id: string) => {
-    const activeList = currentView === "preview" ? selectedPhotosList : photos;
+  const handleOpenPreview = useCallback((id: string) => {
+    const { currentView: view, selectedPhotosList: selList, photos: allList, fullviewIndex: currFull } =
+      previewStateRef.current;
+    if (currFull === null) {
+      pushNavLayer("fullview");
+    }
+    const activeList = view === "preview" ? selList : allList;
     const idx = activeList.findIndex((p) => p.id === id);
     setFullviewIndex(idx >= 0 ? idx : 0);
-  };
+  }, [pushNavLayer]);
+
+  const handleCloseFullview = useCallback(() => {
+    setFullviewIndex(null);
+    popNavLayerSilently("fullview");
+  }, [popNavLayerSilently]);
+
+  const handleOpenNoteModal = useCallback((id: string, name: string) => {
+    if (navStateRef.current.activeNoteModalPhoto === null) {
+      pushNavLayer("note");
+    }
+    setActiveNoteModalPhoto({ id, name });
+  }, [pushNavLayer]);
+
+  const handleCloseNoteModal = useCallback(() => {
+    setActiveNoteModalPhoto(null);
+    popNavLayerSilently("note");
+  }, [popNavLayerSilently]);
+
+  // Render item yang ter-memoisasi untuk MasonryGallery: memilih 1 foto hanya me-render 1 kartu itu saja!
+  const renderPhotoCard = useCallback(
+    (photo: Photo) => {
+      const isSelected = selectedSet.has(photo.id);
+      return (
+        <PhotoCard
+          id={photo.id}
+          name={photo.name}
+          isSelected={isSelected}
+          isDisabled={isQuotaFull && !isSelected}
+          onToggle={toggleSelect}
+          onPreview={handleOpenPreview}
+          width={photo.width}
+          height={photo.height}
+          isLandscape={photo.isLandscape}
+        />
+      );
+    },
+    [selectedSet, isQuotaFull, toggleSelect, handleOpenPreview]
+  );
+
+  const handleCrossfadeStart = useCallback(() => {
+    if (!hasStarted && !hasSessionRef.current) {
+      setShowWelcome(true);
+    }
+  }, [hasStarted]);
 
   const handleSaveDraft = async () => {
     if (selectedIds.length === 0 || !folderId) return;
@@ -240,6 +394,7 @@ function GalleryContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menyimpan sementara.");
 
+      pushNavLayer("draftSaved");
       setShowDraftSavedModal(true);
     } catch (err: any) {
       alert(`Gagal menyimpan sementara: ${err.message}`);
@@ -288,7 +443,6 @@ function GalleryContent() {
     }
     window.location.href = `/?folder_id=${encodeURIComponent(cleaned)}`;
   };
-
 
   // Tampilan 0: Form Masukkan Folder jika folder_id belum ada di URL
   if (!folderId) {
@@ -480,12 +634,7 @@ function GalleryContent() {
             isLoading={isLoading}
             folderDetected={Boolean(folderInfo) || Boolean(errorMsg)}
             clientName={folderInfo?.clientName || urlClient || undefined}
-            onCrossfadeStart={() => {
-              // Hanya tampilkan Selamat Datang untuk pengunjung baru (bukan draf / sesi terkunci)
-              if (!hasStarted && !hasSessionRef.current) {
-                setShowWelcome(true);
-              }
-            }}
+            onCrossfadeStart={handleCrossfadeStart}
           />
         )}
 
@@ -548,26 +697,76 @@ function GalleryContent() {
                   }}>
                   Tidak ada foto yang ditemukan di folder Google Drive ini.
                 </div>
+              ) : sectionsWithPhotos.length > 0 ? (
+                /* ========================================================
+                   KONDISI B: JIKA ADA SUBFOLDER (Permintaan 1.c)
+                   Tampilkan masing-masing folder menjadi section dengan judul subfolder
+                   ======================================================== */
+                <div style={{ display: "flex", flexDirection: "column", gap: "38px" }}>
+                  {sectionsWithPhotos.map((sec) => (
+                    <div key={sec.id} style={{ width: "100%" }}>
+                      {/* Judul Section Berdasarkan Nama Subfolder */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: "14px",
+                          padding: "0 4px",
+                          borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
+                          paddingBottom: "8px",
+                        }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span
+                            style={{
+                              width: "4px",
+                              height: "20px",
+                              backgroundColor: "#d6a85a",
+                              borderRadius: "2px",
+                              display: "inline-block",
+                            }}
+                          />
+                          <h2
+                            style={{
+                              fontSize: "clamp(1.1rem, 2.5vw, 1.35rem)",
+                              fontWeight: 800,
+                              color: "#ffffff",
+                              letterSpacing: "-0.3px",
+                              margin: 0,
+                            }}>
+                            {sec.title}
+                          </h2>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            color: "#f0cf8e",
+                            backgroundColor: "rgba(214, 168, 90, 0.12)",
+                            border: "1px solid rgba(214, 168, 90, 0.3)",
+                            padding: "2px 10px",
+                            borderRadius: "9999px",
+                          }}>
+                          {sec.secPhotos.length} Foto
+                        </span>
+                      </div>
+
+                      {/* Galeri Masonry Khusus Subfolder Ini */}
+                      <MasonryGallery
+                        photos={sec.secPhotos}
+                        renderItem={renderPhotoCard}
+                      />
+                    </div>
+                  ))}
+                </div>
               ) : (
-                /* Tata Letak Kolom Masonry Pintar: Tanpa Gap Kosong (Landscape Otomatis Menyesuaikan di Samping Portrait) */
+                /* ========================================================
+                   KONDISI A: JIKA TIDAK ADA SUBFOLDER (Permintaan 1.c)
+                   Langsung tampilkan tanpa sekat atau section
+                   ======================================================== */
                 <MasonryGallery
                   photos={photos}
-                  renderItem={(photo) => (
-                    <PhotoCard
-                      id={photo.id}
-                      name={photo.name}
-                      isSelected={selectedIds.includes(photo.id)}
-                      isDisabled={
-                        selectedIds.length >= maxPhotos &&
-                        !selectedIds.includes(photo.id)
-                      }
-                      onToggle={toggleSelect}
-                      onPreview={(id) => handleOpenPreview(id)}
-                      width={photo.width}
-                      height={photo.height}
-                      isLandscape={photo.isLandscape}
-                    />
-                  )}
+                  renderItem={renderPhotoCard}
                 />
               )}
             </div>
@@ -607,9 +806,8 @@ function GalleryContent() {
                     alignItems: "center",
                     gap: "8px",
                     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.65)",
-                    backdropFilter: "blur(10px)",
                     whiteSpace: "nowrap",
-                    transition: "all 0.2s ease",
+                    transition: "background-color 0.2s ease, border-color 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = "#d6a85a";
@@ -679,9 +877,7 @@ function GalleryContent() {
                       whiteSpace: "nowrap",
                     }}>
                     <span>
-                      {isQuotaFull
-                        ? `Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`
-                        : `Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`}
+                      {`Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`}
                     </span>
                     <span
                       style={{
@@ -721,22 +917,22 @@ function GalleryContent() {
             isSubmitting={isSubmitting}
             onBackToGallery={handleBackToGallery}
             onConfirmSubmit={handleSubmit}
-            onPreview={(id) => handleOpenPreview(id)}
+            onPreview={handleOpenPreview}
             onToggle={toggleSelect}
             photoNotes={photoNotes}
-            onOpenNote={(id, name) => setActiveNoteModalPhoto({ id, name })}
+            onOpenNote={handleOpenNoteModal}
           />
         )}
 
-      {/* 4. TAMPILAN 3: HALAMAN SUKSES FINAL DENGAN TOMBOL WHATSAPP */}
-      {currentView === "success" && (
-        <SuccessModal
-          clientName={clientName}
-          selectedFileNames={submittedFileNames}
-          notes={notes}
-          adminWaNumber="6281994218428" // Masukkan nomor WhatsApp resmi Fotonic di sini
-        />
-      )}
+        {/* 4. TAMPILAN 3: HALAMAN SUKSES FINAL DENGAN TOMBOL WHATSAPP */}
+        {currentView === "success" && (
+          <SuccessModal
+            clientName={clientName}
+            selectedFileNames={submittedFileNames}
+            notes={notes}
+            adminWaNumber="6281994218428"
+          />
+        )}
 
         {/* 5. Modal Fullview dengan Zoom & Panning Independen (Permintaan #2 & #3) */}
         {fullviewIndex !== null && (
@@ -744,12 +940,13 @@ function GalleryContent() {
             photos={currentView === "preview" ? selectedPhotosList : photos}
             currentIndex={fullviewIndex}
             isOpen={fullviewIndex !== null}
-            onClose={() => setFullviewIndex(null)}
+            onClose={handleCloseFullview}
             onNavigate={(newIdx) => setFullviewIndex(newIdx)}
             selectedIds={selectedIds}
             onToggle={toggleSelect}
             photoNotes={photoNotes}
-            onOpenNote={(id, name) => setActiveNoteModalPhoto({ id, name })}
+            onOpenNote={handleOpenNoteModal}
+            isQuotaFull={isQuotaFull}
           />
         )}
 
@@ -764,9 +961,9 @@ function GalleryContent() {
                 ...prev,
                 [activeNoteModalPhoto.id]: noteText,
               }));
-              setActiveNoteModalPhoto(null);
+              handleCloseNoteModal();
             }}
-            onClose={() => setActiveNoteModalPhoto(null)}
+            onClose={handleCloseNoteModal}
           />
         )}
 
@@ -793,6 +990,7 @@ function GalleryContent() {
             onContinue={() => {
               setShowDraftSavedModal(false);
               forceUnlockScroll();
+              popNavLayerSilently("draftSaved");
             }}
           />
         )}
@@ -833,6 +1031,7 @@ function GalleryContent() {
               }
               setShowWelcome(false);
               setHasStarted(true);
+              pushNavLayer("preview");
               setCurrentView("preview");
               setShowLockedModal(false);
               forceUnlockScroll();

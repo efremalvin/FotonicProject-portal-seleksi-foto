@@ -86,16 +86,15 @@ export default function LoadingScreen({
         transition: "opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
         pointerEvents: isFadingOut ? "none" : "auto",
       }}>
-      {/* Ambient Lighting di Belakang Icon Shutter */}
+      {/* Ambient Lighting di Belakang Icon Shutter (Gradien Halus Bebas Blur Filter Berat) */}
       <div
         style={{
           position: "absolute",
-          width: "320px",
-          height: "320px",
+          width: "360px",
+          height: "360px",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(214, 168, 90, 0.18) 0%, rgba(9, 9, 11, 0) 70%)",
-          filter: "blur(40px)",
+            "radial-gradient(circle, rgba(214, 168, 90, 0.14) 0%, rgba(214, 168, 90, 0.05) 40%, rgba(9, 9, 11, 0) 70%)",
           pointerEvents: "none",
         }}
       />
@@ -120,13 +119,12 @@ export default function LoadingScreen({
             height: "88px",
             borderRadius: "50%",
             border: "1.5px solid rgba(214, 168, 90, 0.35)",
-            backgroundColor: "rgba(22, 22, 26, 0.75)",
+            backgroundColor: "rgba(22, 22, 26, 0.9)",
             boxShadow:
               "0 0 35px rgba(214, 168, 90, 0.22), inset 0 0 15px rgba(214, 168, 90, 0.12)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backdropFilter: "blur(10px)",
             marginBottom: "24px",
           }}>
           {/* Gambar Icon Shutter / Aperture Berputar Halus */}
@@ -138,7 +136,6 @@ export default function LoadingScreen({
               width: "48px",
               height: "48px",
               objectFit: "contain",
-              filter: "drop-shadow(0 0 8px rgba(240, 207, 142, 0.4))",
             }}
           />
         </div>

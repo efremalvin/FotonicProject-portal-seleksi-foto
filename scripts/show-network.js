@@ -1,4 +1,20 @@
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
+
+// Bersihkan cache chunk server yang usang agar tidak terjadi error "Cannot find module './161.js'"
+try {
+  const nextDir = path.join(process.cwd(), '.next');
+  const buildIdPath = path.join(nextDir, 'BUILD_ID');
+  const serverChunksDir = path.join(nextDir, 'server');
+  if (fs.existsSync(buildIdPath)) {
+    fs.rmSync(nextDir, { recursive: true, force: true });
+  } else if (fs.existsSync(serverChunksDir)) {
+    fs.rmSync(serverChunksDir, { recursive: true, force: true });
+  }
+} catch (e) {
+  // Abaikan jika folder sedang dikunci proses lain
+}
 
 function getLocalIp() {
   const nets = os.networkInterfaces();

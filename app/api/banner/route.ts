@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { driveClient } from "@/lib/google/auth";
-import { getBannerPhoto } from "@/lib/google/drive";
+import { getBannerPhoto, extractFolderId } from "@/lib/google/drive";
 
-// Cache in-memory banner buffer (12 jam)
+// Cache in-memory banner buffer per folderId (12 jam)
 interface CachedBanner {
   buffer: ArrayBuffer;
   contentType: string;
   timestamp: number;
 }
-let bannerCache: CachedBanner | null = null;
-let bannerCacheFolderId = "";
+const bannerCacheMap = new Map<string, CachedBanner>();
 const BANNER_TTL = 12 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const folderId = searchParams.get("folder_id") || process.env.BANNER_FOLDER_ID;
+  const rawFolderId = searchParams.get("folder_id") || process.env.BANNER_FOLDER_ID;
+  const folderId = extractFolderId(rawFolderId);
 
   if (!folderId) {
     return NextResponse.json(
@@ -23,15 +23,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Cek cache
-  if (
-    bannerCache &&
-    bannerCacheFolderId === folderId &&
-    Date.now() - bannerCache.timestamp < BANNER_TTL
-  ) {
-    return new NextResponse(bannerCache.buffer, {
+  // Cek cache per folderId
+  const cached = bannerCacheMap.get(folderId);
+  if (cached && Date.now() - cached.timestamp < BANNER_TTL) {
+    return new NextResponse(cached.buffer, {
       headers: {
-        "Content-Type": bannerCache.contentType,
+        "Content-Type": cached.contentType,
         "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",
       },
     });
@@ -47,26 +44,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Prioritaskan mengambil dari Google CDN thumbnailLink (=w1280) -> Ringan (~120KB) vs Asli (25MB!)
+    // Prioritaskan mengambil dari Google CDN thumbnailLink (=w1080) -> Ringan (~90KB) vs Asli (25MB!)
     if (bannerFile.thumbnailLink) {
-      const bannerUrl = bannerFile.thumbnailLink.replace(/=s\d+$/, "=w1280");
+      const bannerUrl = bannerFile.thumbnailLink.replace(/=s\d+$/, "=w1080");
       const res = await fetch(bannerUrl);
-      const buffer = await res.arrayBuffer();
-      const contentType = res.headers.get("content-type") || bannerFile.mimeType || "image/jpeg";
+      if (res.ok) {
+        const buffer = await res.arrayBuffer();
+        const contentType = res.headers.get("content-type") || bannerFile.mimeType || "image/jpeg";
 
-      bannerCache = {
-        buffer,
-        contentType,
-        timestamp: Date.now(),
-      };
-      bannerCacheFolderId = folderId;
+        if (bannerCacheMap.size >= 30) {
+          const oldestKey = bannerCacheMap.keys().next().value;
+          if (oldestKey) bannerCacheMap.delete(oldestKey);
+        }
+        bannerCacheMap.set(folderId, {
+          buffer,
+          contentType,
+          timestamp: Date.now(),
+        });
 
-      return new NextResponse(buffer, {
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",
-        },
-      });
+        return new NextResponse(buffer, {
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=43200",
+          },
+        });
+      }
     }
 
     // Fallback streaming media langsung jika thumbnailLink belum tersedia
@@ -78,12 +80,11 @@ export async function GET(request: NextRequest) {
     const buffer = res.data as ArrayBuffer;
     const contentType = (res.headers["content-type"] as string) || "image/jpeg";
 
-    bannerCache = {
+    bannerCacheMap.set(folderId, {
       buffer,
       contentType,
       timestamp: Date.now(),
-    };
-    bannerCacheFolderId = folderId;
+    });
 
     return new NextResponse(buffer, {
       headers: {

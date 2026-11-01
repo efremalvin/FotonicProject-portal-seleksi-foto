@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
 
 interface PhotoCardProps {
   id: string;
@@ -14,7 +14,7 @@ interface PhotoCardProps {
   isLandscape?: boolean;
 }
 
-export default function PhotoCard({
+function PhotoCardComponent({
   id,
   name,
   isSelected,
@@ -52,15 +52,15 @@ export default function PhotoCard({
         overflow: "hidden",
         backgroundColor: "#111114",
         cursor: isDisabled && !isSelected ? "not-allowed" : "pointer",
-        outline: isSelected ? "3px solid #d6a85a" : "1px solid rgba(255, 255, 255, 0.08)",
-        outlineOffset: isSelected ? "-3px" : "0",
+        outline: isSelected ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
         boxShadow: isSelected
           ? "0 2px 10px rgba(214, 168, 90, 0.45)"
           : "0 1px 4px rgba(0, 0, 0, 0.3)",
         userSelect: "none",
         aspectRatio: computedAspectRatio,
+        contain: "layout style paint",
       }}>
-      {/* 1. Foto Asli Responsif Sesuai Aspek Rasio (Google Photos Album Tile) */}
+      {/* 1. Foto Asli Responsif Sesuai Aspek Rasio (Bebas Shader Filter Lag saat Scroll) */}
       <img
         src={thumbnailUrl}
         alt={name}
@@ -73,7 +73,6 @@ export default function PhotoCard({
           display: "block",
           objectFit: "cover",
           borderRadius: "10px",
-          filter: isSelected ? "brightness(1.02)" : "brightness(0.96)",
         }}
       />
 
@@ -86,18 +85,70 @@ export default function PhotoCard({
             backgroundColor: "rgba(214, 168, 90, 0.12)",
             pointerEvents: "none",
             borderRadius: "inherit",
+            zIndex: 2,
           }}
         />
       )}
 
-      {/* 3. Pojok Kiri Atas: Ikon Checklist & Unchecklist Lingkaran (Bebas GPU Blur Lag) */}
+      {/* 3. Gradasi Bayangan & Nama Foto di Bawah (Berada di belakang Stroke Line Emas) */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background:
+            "linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.35) 60%, transparent 100%)",
+          padding: "16px 9px 7px 9px",
+          pointerEvents: "none",
+          borderRadius: "0 0 10px 10px",
+          zIndex: 4,
+        }}>
+        <span
+          title={name}
+          style={{
+            fontSize: "0.72rem",
+            fontWeight: 600,
+            color: isSelected ? "#f0cf8e" : "#ededed",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "block",
+            textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
+          }}>
+          {name}
+        </span>
+      </div>
+
+      {/* 4. Stroke Line Emas Saat Terpilih (Berada di DEPAN Gradasi Shadow Bawah) */}
+      {isSelected && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "10px",
+            border: "3px solid #d6a85a",
+            pointerEvents: "none",
+            boxSizing: "border-box",
+            zIndex: 8,
+          }}
+        />
+      )}
+
+      {/* 5. Pojok Kiri Atas: Ikon Checklist & Unchecklist Lingkaran (Pudar saat kuota terpenuhi - Permintaan 1.a) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           if (isDisabled && !isSelected) return;
           onToggle(id);
         }}
-        title={isSelected ? "Batalkan Pilihan" : "Pilih Foto"}
+        title={
+          isSelected
+            ? "Batalkan Pilihan"
+            : isDisabled
+            ? "Kuota foto telah terpenuhi"
+            : "Pilih Foto"
+        }
         style={{
           position: "absolute",
           top: "7px",
@@ -105,11 +156,18 @@ export default function PhotoCard({
           width: "26px",
           height: "26px",
           borderRadius: "50%",
-          backgroundColor: isSelected ? "#d6a85a" : "rgba(18, 18, 22, 0.85)",
+          backgroundColor: isSelected
+            ? "#d6a85a"
+            : isDisabled
+            ? "rgba(18, 18, 22, 0.45)"
+            : "rgba(18, 18, 22, 0.85)",
           color: isSelected ? "#09090b" : "transparent",
           border: isSelected
             ? "2px solid #d6a85a"
+            : isDisabled
+            ? "1.5px solid rgba(255, 255, 255, 0.22)"
             : "2px solid rgba(255, 255, 255, 0.85)",
+          opacity: isDisabled && !isSelected ? 0.32 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -118,13 +176,16 @@ export default function PhotoCard({
           fontWeight: 900,
           boxShadow: isSelected
             ? "0 2px 8px rgba(214, 168, 90, 0.6)"
+            : isDisabled
+            ? "none"
             : "0 1px 4px rgba(0, 0, 0, 0.4)",
+          transition: "background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease",
           zIndex: 10,
         }}>
         {isSelected ? "✓" : ""}
       </button>
 
-      {/* 4. Pojok Kanan Atas: Tombol Perbesar / Mode Fullview (Bebas GPU Blur Lag) */}
+      {/* 6. Pojok Kanan Atas: Tombol Perbesar / Mode Fullview (Bebas GPU Blur Lag) */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -151,35 +212,9 @@ export default function PhotoCard({
         }}>
         ⛶
       </button>
-
-      {/* 5. Gradasi Bayangan & Nama Foto di Bawah */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background:
-            "linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.35) 60%, transparent 100%)",
-          padding: "16px 8px 6px 8px",
-          pointerEvents: "none",
-          borderRadius: "0 0 10px 10px",
-        }}>
-        <span
-          title={name}
-          style={{
-            fontSize: "0.72rem",
-            fontWeight: 600,
-            color: isSelected ? "#f0cf8e" : "#ededed",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "block",
-            textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
-          }}>
-          {name}
-        </span>
-      </div>
     </div>
   );
 }
+
+const PhotoCard = memo(PhotoCardComponent);
+export default PhotoCard;

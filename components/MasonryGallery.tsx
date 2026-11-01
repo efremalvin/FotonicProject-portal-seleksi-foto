@@ -13,19 +13,19 @@ export default function MasonryGallery({ photos, renderItem }: MasonryGalleryPro
   const [numCols, setNumCols] = useState<number>(2);
 
   useEffect(() => {
+    let lastWidth = -1;
     const updateColumnCount = () => {
       const width = window.innerWidth;
-      if (width >= 1024) {
-        setNumCols(4);
-      } else if (width >= 640) {
-        setNumCols(3);
-      } else {
-        setNumCols(2);
-      }
+      // Abaikan event resize akibat sembunyi/munculnya address bar vertikal di HP
+      if (width === lastWidth) return;
+      lastWidth = width;
+
+      const nextCols = width >= 1024 ? 4 : width >= 640 ? 3 : 2;
+      setNumCols((prev) => (prev === nextCols ? prev : nextCols));
     };
 
     updateColumnCount();
-    window.addEventListener("resize", updateColumnCount);
+    window.addEventListener("resize", updateColumnCount, { passive: true });
     return () => window.removeEventListener("resize", updateColumnCount);
   }, []);
 
@@ -50,7 +50,6 @@ export default function MasonryGallery({ photos, renderItem }: MasonryGalleryPro
       // Estimasi rasio tinggi kartu:
       // Portrait (~2:3 atau ~3:4): rasio tinggi ~1.45
       // Landscape (~3:2 atau ~4:3): rasio tinggi ~0.72
-      // Ditambah offset padding & caption ~0.28
       let cardHeight = 1.0;
       if (photo.isLandscape !== undefined) {
         cardHeight = photo.isLandscape ? 0.72 : 1.45;

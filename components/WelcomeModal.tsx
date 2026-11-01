@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { lockScroll, unlockScroll, forceUnlockScroll } from "@/lib/scrollLock";
+import { IconCalendar } from "./Icons";
 
 interface WelcomeModalProps {
   clientName: string;
@@ -52,9 +53,9 @@ export default function WelcomeModal({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(9, 9, 11, 0.88)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
+        backgroundColor: "rgba(9, 9, 11, 0.92)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         zIndex: 999990,
         display: "flex",
         alignItems: "center",
@@ -123,7 +124,7 @@ export default function WelcomeModal({
               borderRadius: "9999px",
               padding: "3px 12px",
             }}>
-            🗓️ Tanggal Sesi: {photoDate}
+            <IconCalendar size={14} color="#d6a85a" style={{ marginRight: 6, verticalAlign: -2 }} /> Tanggal Sesi: {photoDate}
           </div>
         )}
 
