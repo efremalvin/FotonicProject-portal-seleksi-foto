@@ -502,3 +502,57 @@ img {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+
+/* =========================================================
+   MATERIAL SYMBOLS OUTLINED & RESPONSIVE HELPERS (MENU UTAMA)
+   ========================================================= */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.desktop-only-flex {
+  display: none !important;
+}
+
+.desktop-only-block {
+  display: none !important;
+}
+
+.mobile-only-flex {
+  display: flex !important;
+}
+
+.mobile-only-inline-flex {
+  display: inline-flex !important;
+}
+
+@media (min-width: 1024px) {
+  .desktop-only-flex {
+    display: flex !important;
+  }
+  .desktop-only-block {
+    display: block !important;
+  }
+  .mobile-only-flex {
+    display: none !important;
+  }
+  .mobile-only-inline-flex {
+    display: none !important;
+  }
+}

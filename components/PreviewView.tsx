@@ -318,6 +318,67 @@ export default function PreviewView({
         padding: "24px 16px 80px 16px",
         animation: "fadeIn 0.28s ease-in-out",
       }}>
+      {/* Tombol Kembali Diletakkan di Atas (Permintaan 3.b) */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-start",
+          marginBottom: "20px",
+        }}>
+        <button
+          type="button"
+          onClick={onBackToGallery}
+          disabled={isSubmitting}
+          style={{
+            backgroundColor: "#16161a",
+            color: "#ededed",
+            border: "1.5px solid rgba(214, 168, 90, 0.4)",
+            borderRadius: "9999px",
+            height: "44px",
+            padding: "0 18px",
+            cursor: isSubmitting ? "not-allowed" : "pointer",
+            fontSize: "0.86rem",
+            fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "10px",
+            transition: "all 0.25s ease",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          }}
+          onMouseEnter={(e) => {
+            if (!isSubmitting) {
+              e.currentTarget.style.borderColor = "#d6a85a";
+              e.currentTarget.style.backgroundColor = "#1f1f26";
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "rgba(214, 168, 90, 0.4)";
+            e.currentTarget.style.backgroundColor = "#16161a";
+          }}>
+          <span
+            className="preview-icon-badge"
+            style={{
+              backgroundColor: "rgba(214, 168, 90, 0.12)",
+              color: "#f0cf8e",
+            }}>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}>
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </span>
+          <span style={{ whiteSpace: "nowrap" }}>Ubah Pilihan di Galeri</span>
+        </button>
+      </div>
+
       {/* Header Halaman Pratinjau */}
       <div style={{ textAlign: "center", marginBottom: "28px" }}>
         <div
@@ -457,9 +518,8 @@ export default function PreviewView({
         />
       </div>
 
-      {/* Bagian Tombol Aksi: Responsif Mobile & Desktop Tanpa Teks Terpotong / Ikon Tergencet */}
+      {/* Bagian Tombol Aksi: Konfirmasi & Kirim Pilihan */}
       <div className="preview-action-container">
-        {/* Tombol Konfirmasi Pilihan (Gold Pill) */}
         <button
           onClick={onConfirmSubmit}
           disabled={isSubmitting}
@@ -498,44 +558,6 @@ export default function PreviewView({
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </span>
-        </button>
-
-        {/* Tombol Ubah Pilihan di Galeri */}
-        <button
-          onClick={onBackToGallery}
-          disabled={isSubmitting}
-          className="preview-btn-back"
-          style={{
-            backgroundColor: "#16161a",
-            color: "#ededed",
-            border: "1.5px solid rgba(214, 168, 90, 0.4)",
-            cursor: isSubmitting ? "not-allowed" : "pointer",
-            fontSize: "0.9rem",
-            fontWeight: 700,
-            transition: "all 0.25s ease",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
-          }}>
-          <span
-            className="preview-icon-badge"
-            style={{
-              backgroundColor: "rgba(214, 168, 90, 0.12)",
-              color: "#f0cf8e",
-            }}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ display: "block" }}>
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-          </span>
-          <span style={{ whiteSpace: "nowrap" }}>Ubah Pilihan di Galeri</span>
         </button>
       </div>
     </div>

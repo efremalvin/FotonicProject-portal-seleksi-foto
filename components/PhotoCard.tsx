@@ -76,20 +76,6 @@ function PhotoCardComponent({
         }}
       />
 
-      {/* 2. Overlay Halus saat Foto Terpilih (Google Photos Selection Tint) */}
-      {isSelected && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: "rgba(214, 168, 90, 0.12)",
-            pointerEvents: "none",
-            borderRadius: "inherit",
-            zIndex: 2,
-          }}
-        />
-      )}
-
       {/* 3. Gradasi Bayangan & Nama Foto di Bawah (Berada di belakang Stroke Line Emas) */}
       <div
         style={{

@@ -88,6 +88,10 @@ function GalleryContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // State Navigasi Section & Slide View Foto Terpilih (Desktop)
+  const [activeSectionId, setActiveSectionId] = useState<string>("");
+  const [isSlideViewOpen, setIsSlideViewOpen] = useState<boolean>(true);
+
   // Status Tampilan: 'gallery' | 'preview' | 'success'
   const [currentView, setCurrentView] = useState<
     "gallery" | "preview" | "success"
@@ -151,6 +155,9 @@ function GalleryContent() {
         setPhotos(data.photos || []);
         setHasSubfolders(Boolean(data.hasSubfolders));
         setSections(data.sections || []);
+        if (data.sections && data.sections.length > 0) {
+          setActiveSectionId(data.sections[0].id);
+        }
         if (data.folder) {
           setFolderInfo(data.folder);
         }
@@ -312,6 +319,27 @@ function GalleryContent() {
       }))
       .filter((sec) => sec.secPhotos.length > 0);
   }, [hasSubfolders, sections, photos]);
+
+  // Data ringkas section untuk komponen ProgressBar (Navigasi Mobile)
+  const navSections = useMemo(
+    () =>
+      sectionsWithPhotos.map((sec) => ({
+        id: sec.id,
+        title: sec.title,
+        count: sec.secPhotos.length,
+      })),
+    [sectionsWithPhotos]
+  );
+
+  const handleSelectSection = useCallback((sectionId: string) => {
+    setActiveSectionId(sectionId);
+    if (typeof document !== "undefined") {
+      const target = document.getElementById(`section-${sectionId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, []);
 
   // Ref stabil untuk handleOpenPreview agar referensi fungsi tidak berubah-ubah
   const previewStateRef = useRef({ currentView, selectedPhotosList, photos, fullviewIndex });
@@ -661,11 +689,17 @@ function GalleryContent() {
               maxPhotos={maxPhotos}
               folderId={folderId}
             />
-            <ProgressBar current={selectedIds.length} max={maxPhotos} />
+            <ProgressBar
+              current={selectedIds.length}
+              max={maxPhotos}
+              sections={navSections}
+              activeSectionId={activeSectionId || navSections[0]?.id}
+              onSelectSection={handleSelectSection}
+            />
 
             <div
               style={{
-                maxWidth: "1160px",
+                maxWidth: "1440px",
                 margin: "0 auto",
                 padding: "0 12px",
               }}>
@@ -697,89 +731,425 @@ function GalleryContent() {
                   }}>
                   Tidak ada foto yang ditemukan di folder Google Drive ini.
                 </div>
-              ) : sectionsWithPhotos.length > 0 ? (
-                /* ========================================================
-                   KONDISI B: JIKA ADA SUBFOLDER (Permintaan 1.c)
-                   Tampilkan masing-masing folder menjadi section dengan judul subfolder
-                   ======================================================== */
-                <div style={{ display: "flex", flexDirection: "column", gap: "38px" }}>
-                  {sectionsWithPhotos.map((sec) => (
-                    <div key={sec.id} style={{ width: "100%" }}>
-                      {/* Judul Section Berdasarkan Nama Subfolder */}
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "16px",
+                    width: "100%",
+                  }}>
+                  {/* ========================================================
+                     KOLOM KIRI (DESKTOP): NAVIGATION BUTTON SECTION (Permintaan 1.a)
+                     Ditampilkan hanya jika ada section / subfolder di folder client
+                     ======================================================== */}
+                  {sectionsWithPhotos.length > 0 && (
+                    <aside
+                      className="desktop-only-flex"
+                      style={{
+                        width: "215px",
+                        flexShrink: 0,
+                        position: "sticky",
+                        top: "74px",
+                        maxHeight: "calc(100vh - 96px)",
+                        overflowY: "auto",
+                        backgroundColor: "rgba(22, 22, 26, 0.94)",
+                        border: "1px solid rgba(214, 168, 90, 0.3)",
+                        borderRadius: "16px",
+                        padding: "12px 10px",
+                        flexDirection: "column",
+                        gap: "6px",
+                        boxShadow: "0 10px 28px rgba(0, 0, 0, 0.55)",
+                      }}>
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: "14px",
-                          padding: "0 4px",
+                          gap: "8px",
+                          padding: "2px 6px 8px 6px",
                           borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
-                          paddingBottom: "8px",
+                          marginBottom: "2px",
                         }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <span
-                            style={{
-                              width: "4px",
-                              height: "20px",
-                              backgroundColor: "#d6a85a",
-                              borderRadius: "2px",
-                              display: "inline-block",
-                            }}
-                          />
-                          <h2
-                            style={{
-                              fontSize: "clamp(1.1rem, 2.5vw, 1.35rem)",
-                              fontWeight: 800,
-                              color: "#ffffff",
-                              letterSpacing: "-0.3px",
-                              margin: 0,
-                            }}>
-                            {sec.title}
-                          </h2>
-                        </div>
                         <span
                           style={{
-                            fontSize: "0.78rem",
-                            fontWeight: 700,
+                            width: "3px",
+                            height: "14px",
+                            backgroundColor: "#d6a85a",
+                            borderRadius: "2px",
+                            display: "inline-block",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "0.74rem",
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
                             color: "#f0cf8e",
-                            backgroundColor: "rgba(214, 168, 90, 0.12)",
-                            border: "1px solid rgba(214, 168, 90, 0.3)",
-                            padding: "2px 10px",
-                            borderRadius: "9999px",
                           }}>
-                          {sec.secPhotos.length} Foto
+                          Navigasi Folder
                         </span>
                       </div>
 
-                      {/* Galeri Masonry Khusus Subfolder Ini */}
+                      {sectionsWithPhotos.map((sec) => {
+                        const isActive =
+                          (activeSectionId || sectionsWithPhotos[0]?.id) === sec.id;
+                        return (
+                          <button
+                            key={sec.id}
+                            type="button"
+                            onClick={() => handleSelectSection(sec.id)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              width: "100%",
+                              padding: "9px 10px",
+                              borderRadius: "10px",
+                              border: isActive
+                                ? "1px solid rgba(214, 168, 90, 0.45)"
+                                : "1px solid transparent",
+                              backgroundColor: isActive
+                                ? "rgba(214, 168, 90, 0.15)"
+                                : "transparent",
+                              color: isActive ? "#f0cf8e" : "#d4d4d8",
+                              fontSize: "0.8rem",
+                              fontWeight: isActive ? 700 : 600,
+                              textAlign: "left",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}>
+                            <span
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                paddingRight: "6px",
+                              }}>
+                              {sec.title}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                                color: isActive ? "#09090b" : "#f0cf8e",
+                                backgroundColor: isActive
+                                  ? "#d6a85a"
+                                  : "rgba(214, 168, 90, 0.12)",
+                                padding: "2px 7px",
+                                borderRadius: "9999px",
+                                flexShrink: 0,
+                              }}>
+                              {sec.secPhotos.length}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </aside>
+                  )}
+
+                  {/* ========================================================
+                     KOLOM TENGAH: GALERI UTAMA
+                     ======================================================== */}
+                  <div style={{ flex: 1, minWidth: 0, maxWidth: "1160px", margin: "0 auto" }}>
+                    {sectionsWithPhotos.length > 0 ? (
+                      /* KONDISI B: JIKA ADA SUBFOLDER (Permintaan 1.c) */
+                      <div style={{ display: "flex", flexDirection: "column", gap: "38px" }}>
+                        {sectionsWithPhotos.map((sec) => (
+                          <div
+                            key={sec.id}
+                            id={`section-${sec.id}`}
+                            style={{ width: "100%", scrollMarginTop: "78px" }}>
+                            {/* Judul Section Berdasarkan Nama Subfolder */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                marginBottom: "14px",
+                                padding: "0 4px",
+                                borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
+                                paddingBottom: "8px",
+                              }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <span
+                                  style={{
+                                    width: "4px",
+                                    height: "20px",
+                                    backgroundColor: "#d6a85a",
+                                    borderRadius: "2px",
+                                    display: "inline-block",
+                                  }}
+                                />
+                                <h2
+                                  style={{
+                                    fontSize: "clamp(1.1rem, 2.5vw, 1.35rem)",
+                                    fontWeight: 800,
+                                    color: "#ffffff",
+                                    letterSpacing: "-0.3px",
+                                    margin: 0,
+                                  }}>
+                                  {sec.title}
+                                </h2>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "0.78rem",
+                                  fontWeight: 700,
+                                  color: "#f0cf8e",
+                                  backgroundColor: "rgba(214, 168, 90, 0.12)",
+                                  border: "1px solid rgba(214, 168, 90, 0.3)",
+                                  padding: "2px 10px",
+                                  borderRadius: "9999px",
+                                }}>
+                                {sec.secPhotos.length} Foto
+                              </span>
+                            </div>
+
+                            {/* Galeri Masonry Khusus Subfolder Ini */}
+                            <MasonryGallery
+                              photos={sec.secPhotos}
+                              renderItem={renderPhotoCard}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* KONDISI A: JIKA TIDAK ADA SUBFOLDER (Permintaan 1.c) */
                       <MasonryGallery
-                        photos={sec.secPhotos}
+                        photos={photos}
                         renderItem={renderPhotoCard}
                       />
-                    </div>
-                  ))}
+                    )}
+                  </div>
+
+                  {/* ========================================================
+                     KOLOM KANAN (DESKTOP SAJA): SLIDE VIEW FOTO TERPILIH (Permintaan 1.e)
+                     Tampilkan foto terpilih di sebelah kanan galeri dengan tombol hide & unhide
+                     ======================================================== */}
+                  <aside
+                    className="desktop-only-flex"
+                    style={{
+                      width: isSlideViewOpen ? "255px" : "auto",
+                      flexShrink: 0,
+                      position: "sticky",
+                      top: "74px",
+                      maxHeight: "calc(100vh - 96px)",
+                      flexDirection: "column",
+                      transition: "width 0.25s ease",
+                    }}>
+                    {isSlideViewOpen ? (
+                      <div
+                        style={{
+                          backgroundColor: "rgba(22, 22, 26, 0.94)",
+                          border: "1px solid rgba(214, 168, 90, 0.3)",
+                          borderRadius: "16px",
+                          padding: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                          maxHeight: "calc(100vh - 96px)",
+                          boxShadow: "0 10px 28px rgba(0, 0, 0, 0.55)",
+                        }}>
+                        {/* Header Slide View + Tombol Hide */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "8px",
+                            paddingBottom: "8px",
+                            borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
+                          }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                            <span
+                              style={{
+                                width: "3px",
+                                height: "14px",
+                                backgroundColor: "#d6a85a",
+                                borderRadius: "2px",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: "0.76rem",
+                                fontWeight: 800,
+                                color: "#f0cf8e",
+                                whiteSpace: "nowrap",
+                              }}>
+                              Terpilih ({selectedIds.length}/{maxPhotos})
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsSlideViewOpen(false)}
+                            title="Sembunyikan Panel Foto Terpilih"
+                            style={{
+                              backgroundColor: "rgba(255, 255, 255, 0.06)",
+                              border: "1px solid rgba(214, 168, 90, 0.3)",
+                              color: "#d4d4d8",
+                              borderRadius: "9999px",
+                              padding: "3px 9px",
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              flexShrink: 0,
+                              transition: "all 0.15s ease",
+                            }}>
+                            Hide ❯
+                          </button>
+                        </div>
+
+                        {/* Daftar Foto Terpilih */}
+                        {selectedPhotosList.length === 0 ? (
+                          <div
+                            style={{
+                              padding: "28px 10px",
+                              textAlign: "center",
+                              color: "#a1a1aa",
+                              fontSize: "0.76rem",
+                              lineHeight: 1.5,
+                            }}>
+                            Belum ada foto yang dipilih.
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, 1fr)",
+                              gap: "8px",
+                              overflowY: "auto",
+                              paddingRight: "2px",
+                              maxHeight: "calc(100vh - 165px)",
+                            }}>
+                            {selectedPhotosList.map((item) => (
+                              <div
+                                key={item.id}
+                                onClick={() => handleOpenPreview(item.id)}
+                                style={{
+                                  position: "relative",
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  backgroundColor: "#111114",
+                                  border: "1.5px solid rgba(214, 168, 90, 0.55)",
+                                  aspectRatio: "1 / 1",
+                                  cursor: "pointer",
+                                }}>
+                                <img
+                                  src={`/api/thumbnail?id=${item.id}`}
+                                  alt={item.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    display: "block",
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSelect(item.id);
+                                  }}
+                                  title="Batalkan Pilihan"
+                                  style={{
+                                    position: "absolute",
+                                    top: "4px",
+                                    right: "4px",
+                                    width: "20px",
+                                    height: "20px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "rgba(9, 9, 11, 0.85)",
+                                    color: "#f0cf8e",
+                                    border: "1px solid rgba(214, 168, 90, 0.45)",
+                                    fontSize: "0.65rem",
+                                    fontWeight: 800,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                  }}>
+                                  ✕
+                                </button>
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    background:
+                                      "linear-gradient(to top, rgba(0,0,0,0.88), transparent)",
+                                    padding: "10px 5px 3px 5px",
+                                    fontSize: "0.62rem",
+                                    fontWeight: 600,
+                                    color: "#f0cf8e",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}>
+                                  {item.name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Tombol Unhide ketika Slide View disembunyikan */
+                      <button
+                        type="button"
+                        onClick={() => setIsSlideViewOpen(true)}
+                        title="Tampilkan Panel Foto Terpilih"
+                        style={{
+                          backgroundColor: "rgba(22, 22, 26, 0.95)",
+                          border: "1px solid rgba(214, 168, 90, 0.4)",
+                          color: "#f0cf8e",
+                          borderRadius: "14px",
+                          padding: "10px 12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "6px",
+                          cursor: "pointer",
+                          boxShadow: "0 10px 28px rgba(0, 0, 0, 0.65)",
+                          transition: "all 0.2s ease",
+                        }}>
+                        <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>❮ Unhide</span>
+                        <span
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 800,
+                            backgroundColor: "rgba(214, 168, 90, 0.16)",
+                            border: "1px solid rgba(214, 168, 90, 0.35)",
+                            padding: "2px 7px",
+                            borderRadius: "9999px",
+                            color: "#f0cf8e",
+                          }}>
+                          {selectedIds.length}/{maxPhotos}
+                        </span>
+                      </button>
+                    )}
+                  </aside>
                 </div>
-              ) : (
-                /* ========================================================
-                   KONDISI A: JIKA TIDAK ADA SUBFOLDER (Permintaan 1.c)
-                   Langsung tampilkan tanpa sekat atau section
-                   ======================================================== */
-                <MasonryGallery
-                  photos={photos}
-                  renderItem={renderPhotoCard}
-                />
               )}
             </div>
 
-            {/* Tombol Mengambang: Simpan Sementara & Lihat Foto Terpilih (Permintaan #1) */}
+            {/* ========================================================
+               TOMBOL MENGAMBANG DESKTOP: PERTAHANKAN (Permintaan 1.c & 1.d Desktop)
+               ======================================================== */}
             {selectedIds.length > 0 && (
               <div
+                className="desktop-only-flex"
                 style={{
                   position: "fixed",
                   bottom: "20px",
                   left: 0,
                   right: 0,
-                  display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "12px",
@@ -788,7 +1158,7 @@ function GalleryContent() {
                   pointerEvents: "none",
                   flexWrap: "wrap",
                 }}>
-                {/* Tombol 1: Simpan Sementara */}
+                {/* Tombol 1: Simpan Sementara (Desktop) */}
                 <button
                   onClick={handleSaveDraft}
                   disabled={isSavingDraft}
@@ -817,11 +1187,15 @@ function GalleryContent() {
                     e.currentTarget.style.borderColor = "rgba(214, 168, 90, 0.45)";
                     e.currentTarget.style.backgroundColor = "#16161a";
                   }}>
-                  <span>💾</span>
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: "20px", lineHeight: 1 }}>
+                    save_as
+                  </span>
                   <span>{isSavingDraft ? "Menyimpan..." : "Simpan Sementara"}</span>
                 </button>
 
-                {/* Tombol 2: Lihat Foto Terpilih */}
+                {/* Tombol 2: Lihat Foto Terpilih (Desktop) */}
                 <button
                   onClick={handleGoToPreview}
                   style={{
@@ -849,7 +1223,7 @@ function GalleryContent() {
                       zIndex: 1,
                     }}
                   />
-                  {/* Layer 2: Background Hijau Gradien dengan Transisi Opacity Super Halus (Permintaan #5) */}
+                  {/* Layer 2: Background Hijau Gradien dengan Transisi Opacity Super Halus */}
                   <div
                     style={{
                       position: "absolute",
@@ -902,11 +1276,141 @@ function GalleryContent() {
                 </button>
               </div>
             )}
+
+            {/* ========================================================
+               TOMBOL MENGAMBANG MOBILE (Permintaan 1.c & 1.d Mobile)
+               - Kiri Bawah: Simpan Sementara (icon save_as, tinggi & ukuran icon sama dan sejajar, tulisan lebih kecil)
+               - Kanan Bawah: Lihat Foto Terpilih (icon arrow_forward saja)
+               ======================================================== */}
+            {selectedIds.length > 0 && (
+              <div
+                className="mobile-only-flex"
+                style={{
+                  position: "fixed",
+                  bottom: "20px",
+                  left: "16px",
+                  right: "16px",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  zIndex: 9999,
+                  pointerEvents: "none",
+                }}>
+                {/* Kiri Bawah: Tombol Simpan Sementara (Mobile - Permintaan 1.d) */}
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={isSavingDraft}
+                  style={{
+                    pointerEvents: "auto",
+                    height: "48px",
+                    minHeight: "48px",
+                    backgroundColor: "#16161a",
+                    border: "1.5px solid rgba(214, 168, 90, 0.45)",
+                    color: "#f0cf8e",
+                    borderRadius: "9999px",
+                    padding: "0 16px",
+                    cursor: isSavingDraft ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "7px",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.7)",
+                    whiteSpace: "nowrap",
+                  }}>
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: "22px", lineHeight: 1 }}>
+                    save_as
+                  </span>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
+                    {isSavingDraft ? "Menyimpan..." : "Simpan Sementara"}
+                  </span>
+                </button>
+
+                {/* Kanan Bawah: Tombol Lihat Foto Terpilih + Angka Pilihan Foto (Mobile - Permintaan 1.c & 2.a) */}
+                <button
+                  onClick={handleGoToPreview}
+                  aria-label="Lihat Foto Terpilih"
+                  title={`Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`}
+                  style={{
+                    pointerEvents: "auto",
+                    position: "relative",
+                    overflow: "hidden",
+                    height: "48px",
+                    minHeight: "48px",
+                    border: "none",
+                    borderRadius: "9999px",
+                    padding: "0 16px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    boxShadow: isQuotaFull
+                      ? "0 10px 30px rgba(34, 197, 94, 0.55), 0 0 16px rgba(34, 197, 94, 0.3)"
+                      : "0 10px 30px rgba(214, 168, 90, 0.45), 0 0 16px rgba(214, 168, 90, 0.2)",
+                  }}>
+                  {/* Layer 1: Background Emas Gradien */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+                      borderRadius: "inherit",
+                      zIndex: 1,
+                    }}
+                  />
+                  {/* Layer 2: Background Hijau Gradien saat kuota penuh */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #15803d 100%)",
+                      borderRadius: "inherit",
+                      opacity: isQuotaFull ? 1 : 0,
+                      transition: "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
+                      zIndex: 2,
+                    }}
+                  />
+                  {/* Layer 3: Angka Pilihan Foto & Ikon arrow_forward */}
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: 3,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      color: "#09090b",
+                    }}>
+                    <span
+                      style={{
+                        fontSize: "0.78rem",
+                        fontWeight: 800,
+                        whiteSpace: "nowrap",
+                        letterSpacing: "0.01em",
+                      }}>
+                      {`${selectedIds.length}/${maxPhotos}`}
+                    </span>
+                    <span
+                      className="material-symbols-outlined"
+                      style={{
+                        fontSize: "22px",
+                        lineHeight: 1,
+                        color: "#09090b",
+                        fontWeight: 700,
+                      }}>
+                      arrow_forward
+                    </span>
+                  </div>
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {/* 3. TAMPILAN 2: HALAMAN PRATINJAU FOTO TERPILIH */}
-        {currentView === "preview" && (
+        {(currentView === "preview" || currentView === "success") && (
           <PreviewView
             clientName={clientName}
             photoDate={photoDate}
@@ -924,13 +1428,14 @@ function GalleryContent() {
           />
         )}
 
-        {/* 4. TAMPILAN 3: HALAMAN SUKSES FINAL DENGAN TOMBOL WHATSAPP */}
+        {/* 4. TAMPILAN 3: POPUP SUKSES FINAL DENGAN TOMBOL WHATSAPP & TOMBOL SILANG (Permintaan 3.a) */}
         {currentView === "success" && (
           <SuccessModal
             clientName={clientName}
             selectedFileNames={submittedFileNames}
             notes={notes}
             adminWaNumber="6281994218428"
+            onClose={() => setCurrentView("preview")}
           />
         )}
 

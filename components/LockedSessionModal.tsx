@@ -136,12 +136,26 @@ export default function LockedSessionModal({
             fontSize: "0.82rem",
             lineHeight: "1.6",
           }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-            <span style={{ color: "#a1a1aa" }}>⏱️ Waktu Dikunci:</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <span style={{ color: "#a1a1aa", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: "17px", lineHeight: 1, color: "#d6a85a" }}>
+                calendar_clock
+              </span>
+              <span>Waktu Dikunci:</span>
+            </span>
             <span style={{ color: "#ededed", fontWeight: 600 }}>{waktu || "-"}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ color: "#a1a1aa", display: "inline-flex", alignItems: "center", gap: "6px" }}><IconImage size={15} color="#d6a85a" /><span>Jumlah Terkunci:</span></span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span style={{ color: "#a1a1aa", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: "17px", lineHeight: 1, color: "#d6a85a" }}>
+                image
+              </span>
+              <span>Jumlah Terkunci:</span>
+            </span>
             <span style={{ color: "#f0cf8e", fontWeight: 700 }}>{count} Foto</span>
           </div>
 
@@ -184,7 +198,7 @@ export default function LockedSessionModal({
 
         {/* Tombol Aksi */}
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {/* Tombol Buka Kunci & Edit Kembali */}
+          {/* Tombol Buka Kunci & Edit Kembali (Ikon edit_square sesuai Permintaan #1) */}
           <button
             onClick={() => handleAction(onUnlockAndEdit)}
             style={{
@@ -206,7 +220,11 @@ export default function LockedSessionModal({
               transition: "transform 0.15s ease",
             }}>
             <span>Buka Kunci &amp; Edit Kembali</span>
-            <span>✏️</span>
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: "20px", lineHeight: 1, color: "#09090b" }}>
+              edit_square
+            </span>
           </button>
 
           {/* Tombol Lihat Pilihan Terkunci */}
