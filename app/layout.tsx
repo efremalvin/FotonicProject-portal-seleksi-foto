@@ -1,7 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./global.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ? process.env.NEXT_PUBLIC_SITE_URL
+  : process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : "https://fotonic-project-seleksi-foto-client.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Fotonic - Seleksi Foto Klien",
   description: "Portal seleksi foto resmi klien Fotonic Photo & Video Project",
   icons: {
@@ -10,7 +19,28 @@ export const metadata: Metadata = {
       { url: "/favicon.ico", sizes: "any" },
     ],
     shortcut: "/Fotonic Logo White.ico",
-    apple: "/whitelogo2.png",
+    apple: "/og-logo.png",
+  },
+  openGraph: {
+    title: "Fotonic - Seleksi Foto Klien",
+    description: "Portal seleksi foto resmi klien Fotonic Photo & Video Project",
+    type: "website",
+    siteName: "Fotonic Project",
+    images: [
+      {
+        url: "/og-logo.png",
+        width: 600,
+        height: 600,
+        alt: "Fotonic Photo & Video Project",
+        type: "image/png",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Fotonic - Seleksi Foto Klien",
+    description: "Portal seleksi foto resmi klien Fotonic Photo & Video Project",
+    images: ["/og-logo.png"],
   },
 };
 
@@ -30,7 +60,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/Fotonic Logo White.ico" sizes="any" />
         <link rel="shortcut icon" href="/Fotonic Logo White.ico" />
-        <link rel="apple-touch-icon" href="/whitelogo2.png" />
+        <link rel="apple-touch-icon" href="/og-logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
