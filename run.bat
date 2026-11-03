@@ -45,7 +45,7 @@ if exist ".env.local" (
 echo Pilihan Menu:
 echo   [1] Jalankan Next.js (Mode Development - Rekomendasi)
 echo   [2] Build ^& Jalankan Next.js (Mode Production)
-echo   [3] Jalankan Versi Streamlit (Python app.py)
+echo   [3] Jalankan Versi Streamlit (legacy-streamlit/app.py)
 echo   [4] Buka URL Uji Coba Demo Klien di Browser
 echo   [5] Install / Update Dependensi (npm install)
 echo   [6] Bersihkan Cache Next.js (Reset folder .next)

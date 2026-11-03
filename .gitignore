@@ -1,13 +1,17 @@
-fotonic.json
-fotonic-project-*.json
-*.json
-.env
-.env.local
-.bat
+# Dependencies & Build Output
 node_modules/
 .next/
 out/
-.env*.local
-*.pem
-service-account*.json
 *.tsbuildinfo
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env*.local
+.streamlit/secrets.toml
+
+# Google Cloud Service Account Keys
+fotonic.json
+fotonic-project-*.json
+service-account*.json
+*.pem

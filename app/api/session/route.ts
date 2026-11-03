@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
       status: record.status, // "DRAF" | "TERKUNCI"
       waktu: record.waktu,
       clientName: record.clientName,
+      sessionDate: record.sessionDate,
+      quota: record.quota,
       count: record.count,
       selectedFileNames: record.selectedFileNames,
       matchedIds,

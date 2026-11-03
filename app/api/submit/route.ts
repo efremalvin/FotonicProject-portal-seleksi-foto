@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPhotosFromFolder } from "@/lib/google/drive";
+import { getPhotosFromFolder, getFolderDetails } from "@/lib/google/drive";
 import { appendSelectionToSheet } from "@/lib/google/sheets";
 import { formatCombinedNotes } from "@/lib/notesHelper";
 
@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
       notes,
       photoNotes,
       isDraft,
+      photoDate,
+      sessionDate,
     } = body;
 
     if (!folderId || !selectedFileIds || !Array.isArray(selectedFileIds)) {
@@ -72,12 +74,27 @@ export async function POST(request: NextRequest) {
 
     const submissionStatus = isDraft ? "DRAF" : "TERKUNCI";
 
+    let resolvedDate = photoDate || sessionDate || null;
+    let quotaValue = !isNaN(parsedMax) && parsedMax > 0 ? parsedMax : null;
+
+    if (!resolvedDate || !quotaValue) {
+      try {
+        const folderDetails = await getFolderDetails(folderId);
+        if (!resolvedDate) resolvedDate = folderDetails.photoDate;
+        if (!quotaValue) quotaValue = folderDetails.maxPhotos;
+      } catch (e) {
+        // Fallback jika metadata folder gagal diambil
+      }
+    }
+
     await appendSelectionToSheet({
       clientName: clientName || "Klien Fotonic",
       selectedFileNames: resolvedFileNames,
       notes: combinedNotes,
       folderId,
       status: submissionStatus,
+      sessionDate: resolvedDate || "-",
+      quota: quotaValue || effectiveMax,
     });
 
     return NextResponse.json({

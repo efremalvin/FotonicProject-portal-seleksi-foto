@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useState, useEffect, useRef } from "react";
+import { IconFolder } from "@/components/Icons";
 
 export interface NavSectionItem {
   id: string;
@@ -64,11 +65,9 @@ function ProgressBarComponent({
           title="Pilih Kategori / Folder"
           className="mobile-only-inline-flex"
           style={{
-            width: "42px",
             height: "42px",
-            minWidth: "42px",
             minHeight: "42px",
-            borderRadius: "50%",
+            borderRadius: "9999px",
             backgroundColor: menuOpen ? "#d6a85a" : "rgba(9, 9, 11, 0.96)",
             color: menuOpen ? "#09090b" : "#f0cf8e",
             border: "1px solid rgba(214, 168, 90, 0.4)",
@@ -80,12 +79,20 @@ function ProgressBarComponent({
             cursor: "pointer",
             flexShrink: 0,
             transition: "all 0.2s ease",
-            padding: 0,
+            padding: "0 10px",
+            gap: "5px",
           }}>
+          <IconFolder size={18} color={menuOpen ? "#09090b" : "#f0cf8e"} />
           <span
-            className="material-symbols-outlined"
-            style={{ fontSize: "22px", lineHeight: 1 }}>
-            menu
+            style={{
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              maxWidth: "80px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+            {sections.find((s) => s.id === activeSectionId)?.title || "Folder"}
           </span>
         </button>
       )}

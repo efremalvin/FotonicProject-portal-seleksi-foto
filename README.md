@@ -1,305 +1,308 @@
-# 📷 Fotonic - Web Seleksi Foto Klien
+# 📷 Fotonic — Portal Web Seleksi Foto Klien
 
-Portal web modern untuk klien **Fotonic Photo & Video Project** dalam memilih foto terbaik hasil sesi pemotretan (maksimal 15 foto atau sesuai kuota yang ditentukan) secara interaktif, aman, dan langsung tersinkronisasi ke Google Drive serta Google Sheets.
+Portal web interaktif resmi **Fotonic Photo & Video Project** yang dirancang untuk memudahkan klien memilih foto terbaik hasil pemotretan untuk proses *retouching* & *color grading*. Terintegrasi langsung secara *real-time* dengan **Google Drive API v3** dan **Google Sheets API v4**, serta dioptimalkan secara khusus agar tetap ringan dan bebas *lag* (60fps) saat dibuka di perangkat *mobile* berspesifikasi rendah (*low-end devices*).
 
 ---
 
 ## 📑 Daftar Isi
-1. [Ringkasan & Analisis Web](#-ringkasan--analisis-web)
-2. [Fitur Unggulan](#-fitur-unggulan)
-3. [Format Penamaan Folder Google Drive (Deteksi Otomatis)](#-format-penamaan-folder-google-drive-deteksi-otomatis)
-4. [Arsitektur & Tech Stack](#-arsitektur--tech-stack)
-5. [Struktur Direktori](#-struktur-direktori)
-6. [Prasyarat Sistem](#-prasyarat-sistem)
-7. [Instalasi & Konfigurasi](#-instalasi--konfigurasi)
-8. [Cara Menjalankan Web](#-cara-menjalankan-web)
-   - [Menggunakan File Batch (`run.bat`)](#1-cara-mudah-menggunakan-file-batch-runbat)
-   - [Manual via Terminal](#2-manual-via-terminal)
-   - [Versi Legacy Streamlit](#3-versi-legacy-streamlit)
-9. [Panduan Tautan Klien & Query Parameter](#-panduan-tautan-klien--query-parameter)
-10. [Sinkronisasi & Update ke GitHub (`update_repo.bat`)](#-sinkronisasi--update-ke-github-update_repobat)
-11. [Konfigurasi Google Cloud Platform](#-konfigurasi-google-cloud-platform)
+1. [Ringkasan & Arsitektur Sistem](#-ringkasan--arsitektur-sistem)
+2. [Fitur Utama & Spesifikasi Lengkap](#-fitur-utama--spesifikasi-lengkap)
+3. [Optimisasi Performa (Anti-Lag Device Lamban)](#-optimisasi-performa-anti-lag-device-lamban)
+4. [Struktur Direktori Proyek](#-struktur-direktori-proyek)
+5. [Detail Komponen UI & Fungsinya](#-detail-komponen-ui--fungsinya)
+6. [Detail Endpoint API & Pustaka Backend](#-detail-endpoint-api--pustaka-backend)
+7. [Aturan Struktur & Penamaan Folder Google Drive](#-aturan-struktur--penamaan-folder-google-drive)
+8. [Skema Pencatatan Google Sheets (Draf & Terkunci)](#-skema-pencatatan-google-sheets-draf--terkunci)
+9. [Instalasi & Konfigurasi Environment](#-instalasi--konfigurasi-environment)
+10. [Cara Menjalankan Aplikasi](#-cara-menjalankan-aplikasi)
+11. [Panduan Format URL Klien](#-panduan-format-url-klien)
 
 ---
 
-## 🔍 Ringkasan & Analisis Web
+## 🔍 Ringkasan & Arsitektur Sistem
 
-Aplikasi ini dibangun untuk menggantikan proses seleksi foto konvensional yang manual dan rawan kesalahan. 
+Aplikasi ini dibangun menggunakan **Next.js 14 (App Router)** dengan **TypeScript** dan **React 18**. Seluruh kredensial rahasia (*Service Account Google*) disimpan dan dijalankan sepenuhnya di sisi server (*Server-Side Route Handlers*), sehingga folder Google Drive klien tetap aman tanpa perlu mengekspos kunci API ke browser klien.
 
-### 1. Masalah yang Diselesaikan
-- **Distribusi File Aman**: Klien hanya dapat melihat pratinjau foto resolusi optimal tanpa tombol unduh (*no-download policy*) untuk melindungi hak cipta sebelum foto final diserahkan.
-- **Tampilan Foto Asli Tanpa Crop**: Foto portrait tetap tampil vertikal penuh dan landscape tetap tampil horizontal penuh tanpa terpotong (*no crop*), menggunakan tata letak galeri Masonry responsif.
-- **Deteksi Otomatis Nama Klien, Tanggal, & Kuota**: Sistem membaca nama folder Google Drive secara otomatis untuk mengisi nama klien, tanggal sesi foto, dan batas kuota tanpa harus mengetik ulang parameter URL secara manual.
-- **Pencegahan Human Error**: Sistem membatasi jumlah foto yang dipilih secara real-time. Klien tidak dapat mengirimkan form jika belum memilih foto atau melebihi kuota.
-- **Otomatisasi Alur Kerja Studio**: Hasil seleksi klien beserta catatan khusus langsung tercatat secara otomatis ke Google Sheets studio Fotonic dan diverifikasi langsung ke folder Google Drive terkait.
-
-### 2. Alur Pengguna (User Flow)
+### Alur Kerja Sistem (End-to-End Flow)
 ```mermaid
 flowchart TD
-    A[Admin Fotonic buat folder di GDrive] --> B[Klien membuka web via link]
-    B --> C[Web parse nama folder: Nama, Tanggal, Kuota]
-    C --> D[Welcome Modal muncul: Info kuota & tanggal sesi]
-    D --> E[Klien memilih foto pada grid galeri tanpa crop]
-    E --> F{Cek Kuota Terpilih}
-    F -->|Melebihi Kuota| G[Centang foto lain terkunci otomatis]
-    F -->|Sesuai Kuota| H[Buka Tab 'Preview' untuk review]
-    H --> I[Klien mereview pilihan & menulis catatan khusus]
-    I --> J[Klik 'Konfirmasi & Kirim Pilihan']
-    J --> K[Next.js API Route memvalidasi file ID ke Drive]
-    K --> L[Simpan data ke Google Sheets]
-    L --> M[Tampilkan Success Modal & Notifikasi WhatsApp]
+    A[Admin Fotonic Unggah Foto ke Folder Google Drive] --> B[Bagikan Link Portal Seleksi ke Klien]
+    B --> C[Loading Screen Animasi Shutter Fotonic]
+    C --> D[Fetch Paralel: /api/photos + /api/session + /api/banner]
+    D --> E{Cek Riwayat Sesi di Google Sheets}
+    E -->|Belum Ada Sesi| F[Tampilkan Welcome Modal Sapaan Klien]
+    E -->|Status: DRAF| G[Tampilkan Modal Lanjutkan Draf & Pulihkan Pilihan]
+    E -->|Status: TERKUNCI| H[Tampilkan Modal Sesi Terkunci: Lihat atau Buka Kunci]
+    F --> I[Galeri Utama Smart Masonry]
+    G --> I
+    H --> I
+    I --> J{Aksi Klien}
+    J -->|Simpan Sementara| K[POST /api/submit isDraft=true -> Status DRAF di Sheets]
+    J -->|Lihat Foto Terpilih| L[Halaman Review Pilihan & Catatan Editor]
+    L --> M[Konfirmasi & Kirim Pilihan]
+    M --> N[POST /api/submit isDraft=false -> Status TERKUNCI di Sheets]
+    N --> O[Halaman Sukses + Rekap Otomatis ke WhatsApp Admin]
 ```
 
 ---
 
-## ✨ Fitur Unggulan
+## ✨ Fitur Utama & Spesifikasi Lengkap
 
-- 🎨 **Tema Gelap & Aksen Gold Mewah**: Mengadopsi palet warna gelap elegan (`#09090b` Ink, `#16161a` Card) dengan aksen Gold (`#d6a85a`, `#f0cf8e`) senada dengan identitas visual portofolio Fotonic.
-- 📐 **Tampilan Foto Pas Tanpa Crop**: Tata letak Masonry responsif yang mempertahankan proporsi alami setiap foto (portrait tetap portrait, landscape tetap landscape tanpa terpotong atau terdistorsi).
-- 📅 **Penampil Tanggal Sesi Foto**: Tanggal pemotretan ditampilkan di bawah nama klien dengan tipografi badge emas yang proporsional dan elegan.
-- ⚡ **Streaming Thumbnail Aman**: Gambar di-stream melalui backend Next.js (`/api/thumbnail`) menggunakan resolusi terkompresi hemat bandwidth (~w600, < 100 KB) dengan caching HTTP, sehingga folder Google Drive tetap aman tanpa harus dibuka untuk umum.
-- 📊 **Dynamic Sticky Counter (Pekat & Kontras Tinggi)**: Bar kemajuan yang melayang dengan latar belakang hitam pekat (`rgba(9,9,11,0.95)`), bingkai aksen gold, dan angka counter kontras tinggi (`X / max Foto`) yang sangat mudah terbaca.
-- 🔄 **Tombol Aksi Tinjauan Konsisten**: Desain tombol "← Ubah Pilihan di Galeri" dan "Konfirmasi & Kirim Pilihan ✓" dibuat simetris dengan gaya pil (*pill-shaped*), tinggi seimbang, dan visual harmonis.
-- 🔍 **Lightbox Modal (Zoom Foto)**: Klien dapat memperbesar foto untuk memeriksa detail ekspresi dan fokus sebelum memilih.
-- 📝 **Tinjauan Seleksi & Catatan**: Halaman pratinjau khusus yang memfilter hanya foto-foto terpilih, memungkinkan klien membatalkan pilihan tertentu dan menyisipkan catatan revisi/editing.
-- 🛡️ **Validasi Ganda (Client & Server)**: Memastikan integritas data dan mencegah manipulasi kuota atau injeksi file ID liar.
+### 1. Identitas Visual *Dark Luxury & Champagne Gold*
+- Menggunakan palet warna gelap obsidian (`#09090b`, `#16161a`) dengan aksen emas mewah (`#d6a85a`, `#f0cf8e`) yang senada dengan portofolio resmi Fotonic.
+- Dilengkapi **Loading Screen Animasi Shutter Fotonic** dengan transisi *crossfade* mulus menuju modal pembuka.
 
----
+### 2. Galeri *Smart Masonry* Tanpa Terpotong (*Strict No-Crop*)
+- Mempertahankan rasio asli foto (**Portrait 2:3** maupun **Landscape 3:2**).
+- Algoritma *Smart Height-Balancing* secara otomatis menyusun foto ke kolom terpendek (2 kolom di HP, 3 kolom di Tablet, 4 kolom di Desktop) sehingga foto *landscape* dan *portrait* berpadu rapi tanpa celah kosong.
+- Ketika foto dipilih, muncul **Stroke Line Emas 3px** tegas di bagian depan bayangan nama file serta efek *tint* emas halus.
+- Ketika kuota foto telah terpenuhi (`selected === maxPhotos`), tombol pilih pada foto lain otomatis memudar (*disabled*) dan tombol aksi melayang berubah menjadi hijau elegan dengan transisi halus.
 
-## 🏷️ Format Penamaan Folder Google Drive (Deteksi Otomatis)
+### 3. Deteksi Otomatis Subfolder & Folder `Cover`
+- **Tanpa Subfolder**: Jika di dalam folder klien langsung berisi foto-foto, seluruh foto langsung ditampilkan dalam satu galeri utuh tanpa sekat.
+- **Dengan Subfolder**: Jika di dalam folder klien terdapat subfolder (misal: *"Sesi Studio"*, *"Sesi Outdoor"*), masing-masing subfolder otomatis dirender menjadi *section* terpisah lengkap dengan judul subfolder dan penghitung jumlah foto.
+- **Subfolder `Cover` Khusus Banner**: Subfolder bernama `Cover` (tidak peka huruf besar/kecil) otomatis dikecualikan dari daftar galeri seleksi dan digunakan khusus sebagai sumber gambar *Hero Banner*.
 
-Sistem dapat membaca metadata nama folder Google Drive secara otomatis untuk menentukan:
-1. **Nama Klien**
-2. **Tanggal Foto**
-3. **Kuota Pemilihan Foto**
+### 4. *Hero Banner* Cerdas dengan Pemindai Titik Fokus Wajah (*YCbCr Skin Scanner*)
+- Pada tampilan *mobile*, banner menampilkan foto sampul klien dengan pemindaian krominansi kulit manusia (*YCbCr*) dan *Browser FaceDetector API* untuk memposisikan wajah subjek di area aman (tidak tertutup teks judul maupun terpotong di tepi atas).
+- Pada tampilan *desktop*, header tampil bersih, minimalis, dan fokus langsung pada galeri foto.
+- Menyertakan badge tanggal sesi foto, kuota maksimal, serta tombol pintasan Instagram resmi **`@fotonicproject`** berikon emas.
 
-### Format Standar:
-```text
-[Nama Client], [Tanggal Foto], [Kuota Pemilihan Foto]
-```
+### 5. Mode Layar Penuh (*Fullview Lightbox*) Independen
+- Menampilkan foto beresolusi tinggi dengan latar belakang hitam pekat (`#000000`).
+- Mendukung **Double-Tap / Double-Click Instan** (tanpa perlu tahan/*hold*), **Pinch-to-Zoom** (cubit 2 jari di HP), **Mouse Wheel Zoom**, serta **Drag / Panning** ke segala arah.
+- Navigasi antar foto menggunakan *swipe* kiri/kanan atau tombol panah keyboard dengan efek transisi *Drop-to-Black* 200ms.
+- Dilengkapi tombol **Catatan Khusus (`📝 Catatan`)** dan tombol **Pilih / Terpilih (`✓ Terpilih`)** langsung di dalam mode layar penuh.
 
-### Contoh Format yang Didukung:
-- `Arya Pratama, 31 Oktober 2026, 15 Foto`
-- `Budi & Siti - 28/10/2026 - 15`
-- `Cindy Laura, 15 November 2026, 10`
-- `Keluarga Wijaya - 2026-11-01 - 20 Foto`
+### 6. Catatan Khusus Per Foto & Catatan Umum Editor
+- Klien dapat menambahkan instruksi *editing* spesifik pada foto tertentu (misal: *"Bersihkan objek di latar belakang pada DSC_0081.JPG"*), baik dari mode Fullview maupun dari halaman Review.
+- Klien juga dapat menambahkan catatan umum keseluruhan sesi di halaman Review sebelum mengirim pilihan.
 
-> [!TIP]
-> Karakter pemisah yang didukung: koma (`,`), tanda hubung (` - `), garis bawah (`_`), atau pipa (`|`).
-> Jika URL menyertakan parameter `?klien=...`, `?date=...`, atau `?max=...`, nilai di URL akan menjadi prioritas pengganti.
+### 7. Fitur **Simpan Sementara (Draf)** & **Kunci Pilihan**
+- **Simpan Sementara (`DRAF`)**: Klien dapat menyimpan progres pemilihan foto kapan saja ke Google Sheets. Saat klien membuka kembali tautan di kemudian hari, sistem otomatis memulihkan foto-foto yang telah dipilih beserta catatannya.
+- **Konfirmasi & Kirim (`TERKUNCI`)**: Mengunci pilihan final ke Google Sheets. Jika tautan dibuka kembali setelah dikunci, sistem menampilkan modal **Pilihan Foto Sudah Dikunci** dengan opsi untuk sekadar melihat daftar foto terkunci atau membuka kunci untuk mengedit ulang.
 
----
-
-## 🛠️ Arsitektur & Tech Stack
-
-Aplikasi ini memiliki 2 fondasi:
-1. **Next.js (App Router) — Versi Utama & Rekomendasi**:
-   - **Framework**: [Next.js 14](https://nextjs.org/) (React 18, TypeScript)
-   - **Styling**: Dark & Gold Modular CSS (`app/global.css`) dengan aksen palet Fotonic Porto
-   - **Backend API**: Next.js Route Handlers (`/api/photos`, `/api/thumbnail`, `/api/banner`, `/api/submit`)
-   - **Cloud SDK**: `googleapis` (Drive API v3, Sheets API v4)
-
-2. **Streamlit (Python) — Versi Prototype / Cadangan**:
-   - Berkas `app.py` dan `MainScript/app.py`
-   - Menggunakan pustaka Python: `streamlit`, `gspread`, `google-api-python-client`, `google-auth`
+### 8. Dukungan Tombol Kembali Fisik HP (*Mobile Hardware Back Button*)
+- Terintegrasi dengan `window.history.pushState` dan `popstate`: menekan tombol *Back* di HP saat membuka Modal Catatan, Mode Fullview, atau Halaman Review akan mengembalikan pengguna ke tampilan sebelumnya secara bertahap tanpa keluar dari website.
 
 ---
 
-## 📁 Struktur Direktori
+## ⚡ Optimisasi Performa (Anti-Lag Device Lamban)
+
+Kode ini telah dioptimalkan secara khusus agar berjalan mulus di perangkat Android/iOS spesifikasi rendah:
+
+1. **Isolasi Re-render React (`React.memo` & Pencarian `Set` $O(1)$)**:
+   - Kartu foto ([`PhotoCard.tsx`](components/PhotoCard.tsx) & [`PreviewView.tsx`](components/PreviewView.tsx)) dibungkus dengan `React.memo` dan fungsi callback stabil (`useCallback`).
+   - Memilih 1 foto dari 500 foto hanya me-render ulang **1 kartu yang diklik**, bukan seluruh 500 kartu.
+   - Mengetik catatan di `<textarea>` halaman Review tidak memicu render ulang pada grid foto.
+2. **Manajemen Memori GPU & CSS Containment (`contain: layout style paint`)**:
+   - Menghindari alokasi ratusan layer tekstur GPU (`translateZ(0)` berlebih) pada item galeri yang dapat menguras habis VRAM HP RAM 2GB–4GB.
+   - Menghapus filter shader per-gambar di galeri dan mengunci `aspect-ratio` setiap kartu untuk mencegah *Cumulative Layout Shift (CLS)* saat scroll cepat.
+3. **Zoom & Panning 60fps via *Direct DOM Transform***:
+   - Pergeseran jari (*touchmove* / *mousemove*) pada [`PhotoModal.tsx`](components/PhotoModal.tsx) memodifikasi `style.transform` (`translate3d`) langsung ke elemen DOM melalui `ref` tanpa memicu siklus render React di setiap piksel gerakan jari.
+4. **Query Paralel, Deduplikasi *In-Flight Request*, & Cache Memori Server**:
+   - Pembacaan subfolder dan foto utama di Google Drive dijalankan secara paralel (`Promise.all`).
+   - Permintaan serentak ke folder atau thumbnail yang sama dideduplikasi di sisi server dan disimpan dalam *in-memory cache* (respon ~1ms untuk akses berikutnya).
+   - Thumbnail galeri dikompresi optimal (`=w420`) dan gambar Fullview menggunakan CDN resolusi tinggi (`=s1600`) yang tajam namun hemat memori dekoder gambar di HP.
+
+---
+
+## 📁 Struktur Direktori Proyek
 
 ```text
 Web-Seleksi-Seleksi-Foto-Client/
-├── app/                        # Next.js App Router
-│   ├── api/                    # Endpoint Backend Internal
-│   │   ├── banner/route.ts     # Mengambil foto cover banner
-│   │   ├── photos/route.ts     # Mengambil daftar foto & metadata folder
-│   │   ├── submit/route.ts     # Validasi & pencatatan ke Google Sheets
-│   │   └── thumbnail/route.ts  # Proxy streaming thumbnail aman
-│   ├── global.css              # Dark & Gold styling, masonry & scrollbar
-│   ├── layout.tsx              # Root layout & konfigurasi font
-│   └── page.tsx                # Halaman utama galeri seleksi
-├── components/                 # Komponen Antarmuka Klien
-│   ├── ConfirmModal.tsx        # Modal konfirmasi sebelum submit
-│   ├── HeroBanner.tsx          # Banner cover, nama klien & tanggal sesi
-│   ├── PhotoCard.tsx           # Kartu foto galeri pas tanpa crop
-│   ├── PhotoModal.tsx          # Lightbox pratinjau resolusi tinggi
-│   ├── PreviewView.tsx         # Tampilan tinjauan foto terpilih + tombol konsisten
-│   ├── ProgressBar.tsx         # Sticky counter pekat & kontras tinggi
-│   ├── Successmodal.tsx        # Modal sukses & konfirmasi WhatsApp
-│   └── WelcomeModal.tsx        # Modal panduan awal klien
-├── lib/                        # Pustaka & Integrasi Google
-│   └── google/
-│       ├── auth.ts             # Inisialisasi Service Account JWT
-│       ├── drive.ts            # Logika pembacaan Google Drive & parser folder
-│       └── sheets.ts           # Logika penulisan Google Sheets
-├── public/                     # Aset statis & logo
-│   ├── blacklogo1.png
-│   ├── blacklogo2.png
-│   ├── whitelogo1.png
-│   └── whitelogo2.png
-├── MainScript/                 # Berkas cadangan Streamlit asli
-├── .env.example                # Contoh format variabel lingkungan (placeholder aman)
-├── .env.local                  # Konfigurasi rahasia lokal (diabaikan git)
-├── app.py                      # Skrip Streamlit Python
-├── package.json                # Dependensi Node.js & skrip npm
-├── requirements.txt            # Dependensi Python
-├── run.bat                     # Otomasi Windows untuk menjalankan aplikasi
-└── update_repo.bat             # Otomasi Windows untuk Git commit & push
+├── app/                            # Next.js 14 App Router (Halaman & Backend API)
+│   ├── api/                        # Server-Side Route Handlers
+│   │   ├── banner/route.ts         # Endpoint streaming & caching foto Hero Banner
+│   │   ├── photos/route.ts         # Endpoint daftar foto, subfolder, & metadata klien
+│   │   ├── session/route.ts        # Endpoint pengecekan sesi DRAF / TERKUNCI di Sheets
+│   │   ├── submit/route.ts         # Endpoint penyimpanan DRAF & penguncian pilihan ke Sheets
+│   │   └── thumbnail/route.ts      # Proxy streaming thumbnail (=w420) & fullview (=s1600)
+│   ├── global.css                  # Styling utama Dark & Gold, layout Masonry, & animasi
+│   ├── layout.tsx                  # Root HTML layout, metadata SEO, & font Montserrat
+│   └── page.tsx                    # Orkestrasi state utama, navigasi Back HP, & alur halaman
+├── components/                     # Komponen Antarmuka Pengguna (React Client Components)
+│   ├── ConfirmModal.tsx            # Komponen modal konfirmasi cadangan
+│   ├── DraftSavedModal.tsx         # Modal notifikasi simpan sementara & lanjutkan draf
+│   ├── Footer.tsx                  # Footer brand Fotonic identik Web-Porto (WA & IG)
+│   ├── HeroBanner.tsx              # Header klien, auto-focal wajah mobile, & link IG
+│   ├── Icons.tsx                   # Kumpulan ikon SVG vektor kustom Fotonic
+│   ├── LoadingScreen.tsx           # Layar loading awal dengan animasi shutter berputar
+│   ├── LockedSessionModal.tsx      # Modal informasi sesi yang telah dikunci sebelumnya
+│   ├── MasonryGallery.tsx          # Grid Masonry pintar penyeimbang tinggi kolom
+│   ├── PhotoCard.tsx               # Kartu foto galeri (ter-memoisasi, stroke emas di depan)
+│   ├── PhotoModal.tsx              # Lightbox fullview dengan zoom/pan 60fps & catatan
+│   ├── PhotoNoteModal.tsx          # Modal input catatan khusus per foto
+│   ├── PreviewView.tsx             # Halaman tinjauan foto terpilih & catatan umum editor
+│   ├── ProgressBar.tsx             # Sticky progress bar & counter kuota foto
+│   ├── Successmodal.tsx            # Halaman sukses akhir & integrasi pesan WhatsApp
+│   └── WelcomeModal.tsx            # Modal sapaan awal & panduan pemilihan foto
+├── lib/                            # Pustaka Logika Bisnis & Integrasi Eksternal
+│   ├── google/
+│   │   ├── auth.ts                 # Autentikasi JWT Google Service Account
+│   │   ├── drive.ts                # Query paralel Google Drive, parser folder, & cache
+│   │   └── sheets.ts               # Baca/tulis rekapan seleksi ke Google Sheets
+│   ├── notesHelper.ts              # Formatter & parser penggabung catatan foto + catatan umum
+│   └── scrollLock.ts               # Pengunci scroll halaman berbasis reference-counting
+├── public/                         # Aset Statis Publik
+│   ├── icons/                      # File master SVG ikon (Calendar, Location, Paper)
+│   ├── images/aperture-white.png   # Ikon bilah shutter untuk animasi loading
+│   ├── Fotonic Logo White.ico      # Favicon utama aplikasi
+│   ├── whitelogo1.png              # Logo putih Fotonic utama
+│   └── whitelogo2.png              # Logo sekunder Fotonic
+├── scripts/                        # Skrip Utilitas Node.js
+│   ├── show-network.js             # Pembersih cache chunk .next usang & penampil IP LAN
+│   └── test-connection.mjs         # Skrip diagnostik koneksi Google Drive & Sheets
+├── docs/                           # Dokumentasi Internal Proyek
+│   ├── DESIGN_RULES.md             # Panduan sistem desain Dark & Champagne Gold Fotonic
+│   ├── PROGRESS.md                 # Catatan riwayat tahapan pengembangan
+│   └── GOOGLE_CLOUD_NOTES.txt      # Catatan identitas Service Account GCP
+├── legacy-streamlit/               # Arsip Versi Prototype Python Streamlit
+│   ├── app.py                      # Aplikasi Streamlit generasi pertama
+│   ├── requirements.txt            # Dependensi Python Streamlit
+│   └── MainScript/                 # Skrip cadangan Streamlit awal
+├── .env.example                    # Template variabel environment
+├── next.config.mjs                 # Konfigurasi Next.js & pencegahan korupsi cache dev
+├── package.json                    # Daftar dependensi & skrip NPM
+├── run.bat                         # Launcher interaktif Windows (Menu 1-7)
+├── tsconfig.json                   # Konfigurasi kompilator TypeScript
+└── update_repo.bat                 # Utilitas sinkronisasi Git (Push, Pull, Status)
 ```
 
 ---
 
-## 💻 Prasyarat Sistem
+## 🧩 Detail Komponen UI & Fungsinya
 
-- **Node.js**: Versi `18.x` atau lebih baru (disarankan Node.js `20 LTS` atau `24`)
-- **NPM**: Bawaan dari instalasi Node.js
-- **Git**: Untuk manajemen repositori
-- *(Opsional)* **Python 3.10+**: Hanya jika ingin menjalankan versi Streamlit
-
----
-
-## ⚙️ Instalasi & Konfigurasi
-
-### 1. Salin Konfigurasi Environment
-Buat berkas `.env.local` di root folder proyek:
-
-```bash
-cp .env.example .env.local
-```
-
-### 2. Isi Variabel di `.env.local`
-Buka file `.env.local` dan masukkan kredensial Service Account Google Anda:
-
-```env
-# Google Service Account Credentials
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@your-project-id.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n[MASUKKAN_PRIVATE_KEY_SERVICE_ACCOUNT_DI_SINI]\n-----END PRIVATE KEY-----\n"
-
-# Google Resources
-GOOGLE_SPREADSHEET_ID=your_google_spreadsheet_id_here
-TEST_DRIVE_FOLDER_ID=your_google_drive_folder_id_here
-```
+| Komponen | Lokasi File | Deskripsi & Tanggung Jawab |
+|---|---|---|
+| **GalleryPage** | `app/page.tsx` | Mengelola state utama (`selectedIds`, `currentView`, `photoNotes`), sinkronisasi sesi Google Sheets, serta navigasi tombol *Back* HP (`popstate`). |
+| **LoadingScreen** | `components/LoadingScreen.tsx` | Menampilkan animasi bilah *shutter* berputar saat mendeteksi metadata klien dan melarut halus (*crossfade*) begitu data siap. |
+| **WelcomeModal** | `components/WelcomeModal.tsx` | Menyapa nama klien, menampilkan tanggal sesi dan batas kuota pemilihan foto kepada pengunjung baru. |
+| **HeroBanner** | `components/HeroBanner.tsx` | Menampilkan foto sampul otomatis di *mobile* (dengan deteksi posisi wajah `requestIdleCallback`) atau header minimalis di *desktop* beserta tombol `@fotonicproject`. |
+| **ProgressBar** | `components/ProgressBar.tsx` | Bar progres melayang (*sticky*) yang menampilkan progres pemilihan (`X / Maks Foto`) dan berubah warna menjadi hijau saat kuota penuh. |
+| **MasonryGallery** | `components/MasonryGallery.tsx` | Membagi foto ke dalam 2/3/4 kolom secara proporsional berdasarkan rasio dimensi foto agar tinggi setiap kolom seimbang. |
+| **PhotoCard** | `components/PhotoCard.tsx` | Kartu foto individu dengan rasio terkunci, garis tepi emas di depan bayangan bawah saat dipilih, tombol centang, dan tombol perbesar (`⛶`). |
+| **PhotoModal** | `components/PhotoModal.tsx` | Layar penuh (*fullview*) dengan nama file di kiri atas, nomor urut di kanan atas, *zoom/pan* 60fps, tombol kembali di kiri bawah, serta tombol `📝 Catatan` dan `Pilih` di kanan bawah. |
+| **PhotoNoteModal** | `components/PhotoNoteModal.tsx` | Dialog pop-up untuk menulis, mengubah, atau menghapus catatan revisi spesifik pada satu foto tertentu. |
+| **PreviewView** | `components/PreviewView.tsx` | Halaman tinjauan akhir yang menampilkan daftar foto terpilih, tombol catatan per foto, kolom catatan umum editor, dan tombol konfirmasi. |
+| **DraftSavedModal** | `components/DraftSavedModal.tsx` | Memberikan konfirmasi saat pilihan berhasil disimpan sementara (`DRAF`) atau saat melanjutkan draf dari kunjungan sebelumnya. |
+| **LockedSessionModal** | `components/LockedSessionModal.tsx` | Muncul jika klien membuka tautan yang sudah berstatus `TERKUNCI`, menampilkan waktu penguncian serta opsi lihat atau buka kunci untuk edit ulang. |
+| **SuccessModal** | `components/Successmodal.tsx` | Menampilkan rekapitulasi bernomor setelah pilihan dikunci, tombol salin ke *clipboard*, dan tombol kirim otomatis ke WhatsApp Admin Fotonic. |
+| **Footer** | `components/Footer.tsx` | Menampilkan informasi brand Fotonic Project, lokasi layanan, serta tombol kontak WhatsApp dan Instagram. |
 
 ---
 
-## 🚀 Cara Menjalankan Web
+## 🔌 Detail Endpoint API & Pustaka Backend
 
-### 1. Cara Mudah: Menggunakan File Batch (`run.bat`)
-Cukup **klik dua kali (double click)** pada berkas:
+| Endpoint / Modul | Metode | Fungsi Utama |
+|---|---|---|
+| `/api/photos` | `GET` | Mengambil metadata folder klien (nama klien, tanggal, kuota) serta seluruh foto & struktur subfolder secara paralel dari Google Drive. |
+| `/api/session` | `GET` | Memeriksa baris terakhir di Google Sheets untuk `folder_id` terkait guna memulihkan sesi `DRAF` atau mendeteksi status `TERKUNCI`. |
+| `/api/thumbnail` | `GET` | Mengalirkan (*stream*) gambar thumbnail (`=w420`) atau gambar resolusi tinggi (`&full=1` -> `=s1600`) melalui memori cache server. |
+| `/api/banner` | `GET` | Mengambil foto sampul dari subfolder `Cover` (atau foto pertama di folder utama jika `Cover` tidak ada) dengan ukuran optimal (`=w1080`). |
+| `/api/submit` | `POST` | Memvalidasi ID foto terhadap isi folder Google Drive, menggabungkan catatan per foto + catatan umum, lalu menyimpan baris baru (`DRAF` / `TERKUNCI`) ke Google Sheets. |
+
+---
+
+## 🏷️ Aturan Struktur & Penamaan Folder Google Drive
+
+### 1. Format Nama Folder Utama Klien
+Sistem secara otomatis mengekstrak **Nama Klien**, **Tanggal Sesi**, dan **Kuota Maksimal Foto** dari nama folder Google Drive:
+
 ```text
-run.bat
+[Nama Klien], [Tanggal Foto], [Kuota Pemilihan Foto]
 ```
-Skrip ini akan otomatis memeriksa dependensi, mengecek file `.env.local`, dan menampilkan menu:
-1. **Mode Development (Next.js)**: Menjalankan server pada `http://localhost:3000`.
-2. **Mode Production (Next.js)**: Build teroptimasi dan menjalankan server produksi.
-3. **Mode Streamlit (Python)**: Menjalankan `app.py` pada `http://localhost:8501`.
-4. **Buka URL Demo Klien**: Membuka browser langsung ke galeri uji coba.
+
+**Contoh Penamaan yang Didukung:**
+- `Arya Pratama, 31 Oktober 2026, 15 Foto`
+- `Budi & Siti - 28/10/2026 - 20`
+- `Cindy Laura | 15 November 2026 | 10 Foto`
+
+### 2. Struktur Isi Folder Google Drive
+Anda dapat menaruh foto dengan 2 cara:
+1. **Langsung di Dalam Folder Klien (Tanpa Subfolder)**:
+   - Seluruh foto langsung tampil dalam satu galeri tanpa pembagian sekat judul.
+2. **Menggunakan Subfolder Kategori**:
+   - Setiap subfolder (selain `Cover`) akan otomatis menjadi *section* terpisah dengan judul sesuai nama subfolder tersebut.
+   - Subfolder bernama **`Cover`** akan otomatis disembunyikan dari daftar pilih foto dan dipakai sebagai gambar *Hero Banner* di tampilan *mobile*.
 
 ---
 
-### 2. Manual via Terminal
+## 📊 Skema Pencatatan Google Sheets (Draf & Terkunci)
 
-#### Mode Development
+Sistem mencatat setiap aktivitas penyimpanan ke **`Sheet1`** pada Google Spreadsheet dari kolom **A** hingga **G**:
+
+| Kolom | Nama Field | Contoh Nilai | Keterangan |
+|---|---|---|---|
+| **A** | Waktu | `2026-11-03 21:45:10` | Waktu penyimpanan (`YYYY-MM-DD HH:mm:ss`) |
+| **B** | Nama Klien | `Arya Pratama` | Nama klien hasil deteksi folder atau parameter URL |
+| **C** | Status | `DRAF` atau `TERKUNCI` | `DRAF` (Simpan Sementara) / `TERKUNCI` (Kirim Final) |
+| **D** | Jumlah Foto | `15` | Total foto yang dipilih |
+| **E** | Daftar File | `DSC_0001.JPG,\nDSC_0005.JPG` | Daftar nama file terurut abjad |
+| **F** | Catatan | `[CATATAN KHUSUS PER FOTO]...` | Gabungan catatan per foto & catatan umum |
+| **G** | Folder ID | `1-NAhCpCPE6IgEkzqIJalkx4IzIfjVEHk` | ID Folder Google Drive sebagai kunci pencocokan sesi |
+
+---
+
+## ⚙️ Instalasi & Konfigurasi Environment
+
+1. Pastikan **Node.js 18+** sudah terpasang di komputer Anda.
+2. Salin file `.env.example` menjadi `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Isi variabel berikut di dalam `.env.local`:
+   ```env
+   GOOGLE_SERVICE_ACCOUNT_EMAIL=nama-service-account@project-id.iam.gserviceaccount.com
+   GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   GOOGLE_SPREADSHEET_ID=id_google_spreadsheet_anda
+   TEST_DRIVE_FOLDER_ID=id_folder_drive_untuk_demo
+   ```
+4. Pastikan folder Google Drive klien sudah dibagikan (*Share*) ke email Service Account sebagai **Viewer**, dan file Google Spreadsheet dibagikan sebagai **Editor**.
+
+---
+
+## 🚀 Cara Menjalankan Aplikasi
+
+### Cara 1: Melalui Launcher Interaktif (`run.bat`)
+Klik dua kali file **`run.bat`** pada Windows Explorer, lalu pilih nomor menu:
+- **`[1]` Jalankan Next.js (Mode Development)**: Membersihkan chunk usang secara otomatis dan menjalankan server di `http://localhost:3000` (serta menampilkan alamat IP LAN untuk dibuka di HP).
+- **`[2]` Build & Jalankan Next.js (Mode Production)**: Melakukan kompilasi produksi (`next build`) dan menjalankan server produksi (`next start`).
+- **`[6]` Bersihkan Cache Next.js**: Mereset folder `.next` jika diperlukan.
+
+### Cara 2: Melalui Terminal Manual
 ```bash
-# 1. Install dependensi
+# Instalasi paket dependensi
 npm install
 
-# 2. Jalankan server pengembang
+# Menjalankan mode development (lokal & jaringan Wi-Fi/LAN)
 npm run dev
-```
-Akses di browser: `http://localhost:3000`
 
-#### Mode Production
-```bash
+# Menguji koneksi API Google Drive & Google Sheets
+npm run test:connection
+
+# Build & jalankan mode production
 npm run build
 npm start
 ```
 
 ---
 
-### 3. Versi Legacy Streamlit
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+## 🔗 Panduan Format URL Klien
 
----
-
-## 🔗 Panduan Tautan Klien & Query Parameter
-
-> [!IMPORTANT]
-> **Catatan Pengujian Lokal vs Website Online:**
-> - `http://domain-anda.com` adalah **contoh domain** ketika aplikasi sudah di-deploy ke server online / hosting (seperti Vercel, Railway, dsb).
-> - Jika sedang dicoba di komputer lokal Anda, pastikan server sudah berjalan (`npm run dev`), lalu buka alamat:
->   - **Cara 1 (Paling Mudah)**: Buka langsung `http://localhost:3000` di browser. Web akan menampilkan layar pembuka di mana Anda cukup mem-paste link Google Drive klien atau Folder ID, lalu klik **"Buka Galeri Foto"**.
->   - **Cara 2 (Tautan Langsung)**: Buka `http://localhost:3000/?folder_id=[ID_ATAU_LINK_FOLDER_GDRIVE]`.
-> - Sistem kini **otomatis mendukung link lengkap Google Drive** (contoh: `https://drive.google.com/drive/folders/...`) maupun ID folder saja.
-
-### 1. Format Tautan Klien (Otomatis Parse Nama, Tanggal, & Kuota)
-Cukup bagikan link dengan parameter `folder_id`:
-
-```text
-# Di Komputer Lokal:
-http://localhost:3000/?folder_id=[ID_ATAU_LINK_FOLDER_GDRIVE]
-
-# Di Website Online (Setelah Deploy):
-https://domain-anda.com/?folder_id=[ID_ATAU_LINK_FOLDER_GDRIVE]
-```
-
-### 2. Format dengan Parameter Manual Opsional
-Jika Anda ingin menentukan nilai khusus yang mengabaikan nama folder, tambahkan query parameter opsional:
-```text
-http://localhost:3000/?folder_id=[ID_FOLDER]&klien=[NAMA_KLIEN]&date=[TANGGAL]&max=[KUOTA]
-```
-
-### Tabel Parameter:
-| Parameter | Wajib | Keterangan | Contoh |
-|---|---|---|---|
-| `folder_id` | **Wajib** | ID Folder atau Link Lengkap Google Drive tempat foto | `CONTOH_ID_FOLDER_GOOGLE_DRIVE` atau `https://drive.google.com/drive/folders/CONTOH_ID` |
-| `klien` | Opsional | Nama klien (otomatis dibaca dari nama folder jika dikosongkan) | `Arya%20Pratama` |
-| `date` / `tanggal` | Opsional | Tanggal pemotretan (otomatis dibaca dari nama folder jika dikosongkan) | `31%20Oktober%202026` |
-| `max` | Opsional | Kuota maksimal foto (otomatis dibaca dari nama folder jika dikosongkan, default `15`) | `15` |
-
-**Contoh URL Pengujian Lokal:**
-```text
-http://localhost:3000/?folder_id=CONTOH_ID_FOLDER_GOOGLE_DRIVE
-```
-
----
-
-## 🔄 Sinkronisasi & Update ke GitHub (`update_repo.bat`)
-
-Untuk mengupdate repository GitHub secara praktis:
-
-1. **Klik dua kali** pada berkas:
+1. **Membuka lewat Halaman Input Manual**:
+   Buka `http://localhost:3000` (atau domain produksi Anda). Klien/Admin dapat langsung menempelkan (*paste*) tautan lengkap folder Google Drive atau ID Folder ke kolom yang tersedia.
+2. **Membuka lewat Tautan Langsung (Otomatis Deteksi Nama, Tanggal, & Kuota)**:
    ```text
-   update_repo.bat
+   https://domain-anda.com/?folder_id=1-NAhCpCPE6IgEkzqIJalkx4IzIfjVEHk
    ```
-2. Pilih menu:
-   - **`[1] Quick Push`**: Menjalankan `git add -A`, meminta pesan commit, lalu melakukan `git push origin main`.
-   - **`[2] Pull Terbaru`**: Menarik pembaruan dari repository GitHub (`git pull origin main`).
-   - **`[3] Cek Status Repository`**: Melihat status file yang diubah dan riwayat commit.
-   - **`[4] Batalkan Perubahan Lokal`**: Reset working tree ke kondisi commit terakhir.
+3. **Membuka dengan Parameter Kustom Opsional**:
+   ```text
+   https://domain-anda.com/?folder_id=ID_FOLDER&klien=Nama+Klien&date=31+Oktober+2026&max=15
+   ```
 
 ---
 
-## ☁️ Konfigurasi Google Cloud Platform
-
-1. Pastikan **Google Drive API** dan **Google Sheets API** sudah aktif pada proyek GCP Anda.
-2. Buat **Service Account** dan unduh file kunci JSON-nya.
-3. Masukkan `client_email` dan `private_key` ke `.env.local`.
-4. **PENTING**:
-   - Bagikan (*Share*) folder foto Google Drive ke email Service Account (akses minimal: **Viewer**).
-   - Bagikan (*Share*) Google Spreadsheet rekapan ke email Service Account (akses: **Editor**).
-5. Format baris Google Sheets yang dicatat sistem:
-   - **Kolom A**: Waktu submit (`YYYY-MM-DD HH:mm:ss`)
-   - **Kolom B**: Nama Klien
-   - **Kolom C**: Status (`Selesai`)
-   - **Kolom D**: Total Foto Terpilih
-   - **Kolom E**: Daftar Nama File (dipisahkan koma dan baris baru)
-   - **Kolom F**: Catatan Klien (opsional)
-
----
-
-## 📄 Lisensi
-Hak cipta milik **Fotonic Project**. Dikembangkan khusus untuk mempermudah operasional seleksi foto klien studio.
+## 📄 Lisensi & Hak Cipta
+© **Fotonic Photo & Video Project** — Bandar Lampung & Sekitarnya.  
+*"Capture your moment and tell your story"*

@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback } from "react";
 import MasonryGallery from "./MasonryGallery";
-import { IconPaper, IconPaperPlus, IconCalendar, IconImage } from "./Icons";
+import { IconPaper, IconPaperPlus, IconCalendar, IconImage, IconTrash } from "./Icons";
 
 export interface SelectedPhoto {
   id: string;
@@ -280,6 +280,7 @@ interface PreviewViewProps {
   onToggle?: (id: string) => void;
   photoNotes?: Record<string, string>;
   onOpenNote?: (id: string, name: string) => void;
+  onClearAll?: () => void;
 }
 
 export default function PreviewView({
@@ -296,6 +297,7 @@ export default function PreviewView({
   onToggle,
   photoNotes = {},
   onOpenNote,
+  onClearAll,
 }: PreviewViewProps) {
   const renderCard = useCallback(
     (photo: any) => (
@@ -419,22 +421,63 @@ export default function PreviewView({
           Pastikan foto-foto berikut adalah pilihan terbaik Anda sebelum dikirim ke tim editor Fotonic.
         </p>
 
-        {/* Counter Badge */}
+        {/* Counter Badge & Tombol Hapus Semua Pilihan */}
         <div
           style={{
             marginTop: "14px",
             display: "inline-flex",
             alignItems: "center",
-            gap: "6px",
-            backgroundColor: "rgba(214, 168, 90, 0.14)",
-            color: "#f0cf8e",
-            border: "1px solid rgba(214, 168, 90, 0.35)",
-            borderRadius: "9999px",
-            padding: "5px 16px",
-            fontSize: "0.85rem",
-            fontWeight: 800,
+            justifyContent: "center",
+            gap: "10px",
+            flexWrap: "wrap",
           }}>
-          <span>Terpilih: {selectedPhotos.length} / {maxPhotos} Foto</span>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              backgroundColor: "rgba(214, 168, 90, 0.14)",
+              color: "#f0cf8e",
+              border: "1px solid rgba(214, 168, 90, 0.35)",
+              borderRadius: "9999px",
+              padding: "5px 16px",
+              fontSize: "0.85rem",
+              fontWeight: 800,
+            }}>
+            <span>Terpilih: {selectedPhotos.length} / {maxPhotos} Foto</span>
+          </div>
+
+          {selectedPhotos.length > 0 && onClearAll && (
+            <button
+              type="button"
+              onClick={onClearAll}
+              title="Hapus / Batalkan seluruh pilihan foto"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                backgroundColor: "rgba(239, 68, 68, 0.12)",
+                color: "#fca5a5",
+                border: "1px solid rgba(239, 68, 68, 0.35)",
+                borderRadius: "9999px",
+                padding: "5px 14px",
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.6)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.12)";
+                e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.35)";
+              }}>
+              <IconTrash size={16} color="#fca5a5" />
+              <span>Hapus Semua Pilihan</span>
+            </button>
+          )}
         </div>
       </div>
 

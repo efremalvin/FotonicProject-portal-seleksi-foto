@@ -6,7 +6,8 @@
     "dev": "node scripts/show-network.js && next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:connection": "node scripts/test-connection.mjs"
   },
   "dependencies": {
     "googleapis": "^144.0.0",

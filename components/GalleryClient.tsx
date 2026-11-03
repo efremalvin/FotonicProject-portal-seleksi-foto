@@ -15,6 +15,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import DraftSavedModal from "@/components/DraftSavedModal";
 import LockedSessionModal from "@/components/LockedSessionModal";
 import PhotoNoteModal from "@/components/PhotoNoteModal";
+import { IconTrash } from "@/components/Icons";
 import { forceUnlockScroll } from "@/lib/scrollLock";
 
 interface Photo {
@@ -99,6 +100,10 @@ function GalleryContent() {
   // State Navigasi Section & Slide View Foto Terpilih (Desktop)
   const [activeSectionId, setActiveSectionId] = useState<string>("");
   const [isSlideViewOpen, setIsSlideViewOpen] = useState<boolean>(true);
+  const [isFolderNavOpen, setIsFolderNavOpen] = useState<boolean>(true);
+
+  // Modal Konfirmasi Hapus Semua Pilihan Foto
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState<boolean>(false);
 
   // Status Tampilan: 'gallery' | 'preview' | 'success'
   const [currentView, setCurrentView] = useState<
@@ -300,11 +305,22 @@ function GalleryContent() {
     popNavLayerSilently("preview");
   }, [popNavLayerSilently]);
 
-  // Foto-foto yang sedang terpilih (dimemoisasi + mempertahankan dimensi agar tidak re-render saat mengetik catatan)
+  // Map O(1) id -> photo untuk pencarian super cepat
+  const photoMap = useMemo(() => {
+    const map = new Map<string, Photo>();
+    for (const p of photos) {
+      map.set(p.id, p);
+    }
+    return map;
+  }, [photos]);
+
+  // Foto-foto yang sedang terpilih dengan urutan LIFO (Pilihan TERAKHIR berada di PALING ATAS)
   const selectedPhotosList = useMemo(
     () =>
-      photos
-        .filter((p) => selectedSet.has(p.id))
+      [...selectedIds]
+        .reverse()
+        .map((id) => photoMap.get(id))
+        .filter((p): p is Photo => Boolean(p))
         .map((p) => ({
           id: p.id,
           name: p.name,
@@ -312,7 +328,7 @@ function GalleryContent() {
           height: p.height,
           isLandscape: p.isLandscape,
         })),
-    [photos, selectedSet]
+    [selectedIds, photoMap]
   );
 
   // Memoisasi pengelompokan foto per subfolder agar tidak di-filter ulang setiap kali klik pilih foto
@@ -327,6 +343,52 @@ function GalleryContent() {
       }))
       .filter((sec) => sec.secPhotos.length > 0);
   }, [hasSubfolders, sections, photos]);
+
+  // ScrollSpy: Deteksi subfolder/section mana yang sedang berada di layar pengguna secara otomatis saat scroll
+  useEffect(() => {
+    if (sectionsWithPhotos.length <= 1) return;
+
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Garis acuan deteksi di bawah sticky header / progress bar
+          const offsetTop = 130;
+          let currentSecId = sectionsWithPhotos[0]?.id;
+
+          for (const sec of sectionsWithPhotos) {
+            const el = document.getElementById(`section-${sec.id}`);
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top <= offsetTop) {
+                currentSecId = sec.id;
+              }
+            }
+          }
+
+          if (currentSecId) {
+            setActiveSectionId((prev) => (prev !== currentSecId ? currentSecId : prev));
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [sectionsWithPhotos]);
+
+  // Handler Hapus Seluruh Pilihan Foto
+  const handleConfirmClearAll = useCallback(() => {
+    setSelectedIds([]);
+    setPhotoNotes({});
+    setShowClearConfirmModal(false);
+  }, []);
 
   // Data ringkas section untuk komponen ProgressBar (Navigasi Mobile)
   const navSections = useMemo(
@@ -706,10 +768,11 @@ function GalleryContent() {
             />
 
             <div
+              className="gallery-outer-container"
               style={{
-                maxWidth: "1440px",
+                maxWidth: "1680px",
                 margin: "0 auto",
-                padding: "0 12px",
+                paddingBottom: "110px",
               }}>
               {isLoading ? (
                 <div
@@ -755,111 +818,185 @@ function GalleryContent() {
                     <aside
                       className="desktop-only-flex"
                       style={{
-                        width: "215px",
+                        width: isFolderNavOpen ? "215px" : "auto",
                         flexShrink: 0,
                         position: "sticky",
                         top: "74px",
                         maxHeight: "calc(100vh - 96px)",
-                        overflowY: "auto",
-                        backgroundColor: "rgba(22, 22, 26, 0.94)",
-                        border: "1px solid rgba(214, 168, 90, 0.3)",
-                        borderRadius: "16px",
-                        padding: "12px 10px",
                         flexDirection: "column",
-                        gap: "6px",
-                        boxShadow: "0 10px 28px rgba(0, 0, 0, 0.55)",
+                        transition: "width 0.25s ease",
                       }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "2px 6px 8px 6px",
-                          borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
-                          marginBottom: "2px",
-                        }}>
-                        <span
+                      {isFolderNavOpen ? (
+                        <div
                           style={{
-                            width: "3px",
-                            height: "14px",
-                            backgroundColor: "#d6a85a",
-                            borderRadius: "2px",
-                            display: "inline-block",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "0.74rem",
-                            fontWeight: 800,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.08em",
-                            color: "#f0cf8e",
+                            width: "215px",
+                            backgroundColor: "rgba(22, 22, 26, 0.94)",
+                            border: "1px solid rgba(214, 168, 90, 0.3)",
+                            borderRadius: "16px",
+                            padding: "12px 10px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            boxShadow: "0 10px 28px rgba(0, 0, 0, 0.55)",
+                            maxHeight: "calc(100vh - 96px)",
+                            overflowY: "auto",
                           }}>
-                          Navigasi Folder
-                        </span>
-                      </div>
-
-                      {sectionsWithPhotos.map((sec) => {
-                        const isActive =
-                          (activeSectionId || sectionsWithPhotos[0]?.id) === sec.id;
-                        return (
-                          <button
-                            key={sec.id}
-                            type="button"
-                            onClick={() => handleSelectSection(sec.id)}
+                          <div
                             style={{
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
-                              width: "100%",
-                              padding: "9px 10px",
-                              borderRadius: "10px",
-                              border: isActive
-                                ? "1px solid rgba(214, 168, 90, 0.45)"
-                                : "1px solid transparent",
-                              backgroundColor: isActive
-                                ? "rgba(214, 168, 90, 0.15)"
-                                : "transparent",
-                              color: isActive ? "#f0cf8e" : "#d4d4d8",
-                              fontSize: "0.8rem",
-                              fontWeight: isActive ? 700 : 600,
-                              textAlign: "left",
-                              cursor: "pointer",
-                              transition: "all 0.15s ease",
+                              gap: "8px",
+                              padding: "2px 6px 8px 6px",
+                              borderBottom: "1px solid rgba(214, 168, 90, 0.2)",
+                              marginBottom: "2px",
                             }}>
-                            <span
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                              <span
+                                style={{
+                                  width: "3px",
+                                  height: "14px",
+                                  backgroundColor: "#d6a85a",
+                                  borderRadius: "2px",
+                                  display: "inline-block",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: "0.74rem",
+                                  fontWeight: 800,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.08em",
+                                  color: "#f0cf8e",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}>
+                                Folder
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsFolderNavOpen(false)}
+                              title="Sembunyikan Navigasi Folder"
                               style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                paddingRight: "6px",
-                              }}>
-                              {sec.title}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 700,
-                                color: isActive ? "#09090b" : "#f0cf8e",
-                                backgroundColor: isActive
-                                  ? "#d6a85a"
-                                  : "rgba(214, 168, 90, 0.12)",
-                                padding: "2px 7px",
+                                backgroundColor: "rgba(255, 255, 255, 0.06)",
+                                border: "1px solid rgba(214, 168, 90, 0.3)",
+                                color: "#d4d4d8",
                                 borderRadius: "9999px",
+                                padding: "3px 9px",
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
                                 flexShrink: 0,
+                                transition: "all 0.15s ease",
                               }}>
-                              {sec.secPhotos.length}
-                            </span>
-                          </button>
-                        );
-                      })}
+                              Hide ❮
+                            </button>
+                          </div>
+
+                          {sectionsWithPhotos.map((sec) => {
+                            const isActive =
+                              (activeSectionId || sectionsWithPhotos[0]?.id) === sec.id;
+                            return (
+                              <button
+                                key={sec.id}
+                                type="button"
+                                onClick={() => handleSelectSection(sec.id)}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  width: "100%",
+                                  padding: "9px 10px",
+                                  borderRadius: "10px",
+                                  border: isActive
+                                    ? "1px solid rgba(214, 168, 90, 0.45)"
+                                    : "1px solid transparent",
+                                  backgroundColor: isActive
+                                    ? "rgba(214, 168, 90, 0.15)"
+                                    : "transparent",
+                                  color: isActive ? "#f0cf8e" : "#d4d4d8",
+                                  fontSize: "0.8rem",
+                                  fontWeight: isActive ? 700 : 600,
+                                  textAlign: "left",
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                }}>
+                                <span
+                                  style={{
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    paddingRight: "6px",
+                                  }}>
+                                  {sec.title}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 700,
+                                    color: isActive ? "#09090b" : "#f0cf8e",
+                                    backgroundColor: isActive
+                                      ? "#d6a85a"
+                                      : "rgba(214, 168, 90, 0.12)",
+                                    padding: "2px 7px",
+                                    borderRadius: "9999px",
+                                    flexShrink: 0,
+                                  }}>
+                                  {sec.secPhotos.length}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsFolderNavOpen(true)}
+                          title="Tampilkan Navigasi Folder"
+                          style={{
+                            backgroundColor: "rgba(22, 22, 26, 0.95)",
+                            border: "1px solid rgba(214, 168, 90, 0.4)",
+                            color: "#f0cf8e",
+                            borderRadius: "14px",
+                            padding: "10px 12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "6px",
+                            cursor: "pointer",
+                            boxShadow: "0 10px 28px rgba(0, 0, 0, 0.65)",
+                            transition: "all 0.2s ease",
+                          }}>
+                          <span style={{ fontSize: "0.72rem", fontWeight: 800 }}>Folder ❯</span>
+                          <span
+                            style={{
+                              fontSize: "0.68rem",
+                              fontWeight: 800,
+                              backgroundColor: "rgba(214, 168, 90, 0.16)",
+                              border: "1px solid rgba(214, 168, 90, 0.35)",
+                              padding: "2px 7px",
+                              borderRadius: "9999px",
+                              color: "#f0cf8e",
+                              maxWidth: "80px",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}>
+                            {sectionsWithPhotos.find((s) => s.id === activeSectionId)?.title || "Semua"}
+                          </span>
+                        </button>
+                      )}
                     </aside>
                   )}
 
                   {/* ========================================================
-                     KOLOM TENGAH: GALERI UTAMA
+                     KOLOM TENGAH: GALERI UTAMA (Membentang Penuh & Fleksibel)
                      ======================================================== */}
-                  <div style={{ flex: 1, minWidth: 0, maxWidth: "1160px", margin: "0 auto" }}>
+                  <div style={{ flex: 1, minWidth: 0, width: "100%", margin: "0 auto" }}>
                     {sectionsWithPhotos.length > 0 ? (
                       /* KONDISI B: JIKA ADA SUBFOLDER (Permintaan 1.c) */
                       <div style={{ display: "flex", flexDirection: "column", gap: "38px" }}>
@@ -990,24 +1127,51 @@ function GalleryContent() {
                             </span>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => setIsSlideViewOpen(false)}
-                            title="Sembunyikan Panel Foto Terpilih"
-                            style={{
-                              backgroundColor: "rgba(255, 255, 255, 0.06)",
-                              border: "1px solid rgba(214, 168, 90, 0.3)",
-                              color: "#d4d4d8",
-                              borderRadius: "9999px",
-                              padding: "3px 9px",
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              flexShrink: 0,
-                              transition: "all 0.15s ease",
-                            }}>
-                            Hide ❯
-                          </button>
+                          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                            {selectedIds.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowClearConfirmModal(true)}
+                                title="Hapus Semua Pilihan"
+                                style={{
+                                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                                  color: "#fca5a5",
+                                  borderRadius: "9999px",
+                                  padding: "3px 8px",
+                                  fontSize: "0.68rem",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "3px",
+                                  transition: "all 0.15s ease",
+                                }}>
+                                <IconTrash size={13} color="#fca5a5" />
+                                <span>Reset</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setIsSlideViewOpen(false)}
+                              title="Sembunyikan Panel Foto Terpilih"
+                              style={{
+                                backgroundColor: "rgba(255, 255, 255, 0.06)",
+                                border: "1px solid rgba(214, 168, 90, 0.3)",
+                                color: "#d4d4d8",
+                                borderRadius: "9999px",
+                                padding: "3px 9px",
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                flexShrink: 0,
+                                transition: "all 0.15s ease",
+                              }}>
+                              Hide ❯
+                            </button>
+                          </div>
                         </div>
 
                         {/* Daftar Foto Terpilih */}
@@ -1203,6 +1367,40 @@ function GalleryContent() {
                   <span>{isSavingDraft ? "Menyimpan..." : "Simpan Sementara"}</span>
                 </button>
 
+                {/* Tombol Reset / Hapus Pilihan (Desktop) */}
+                <button
+                  type="button"
+                  onClick={() => setShowClearConfirmModal(true)}
+                  title="Hapus Seluruh Pilihan Foto"
+                  style={{
+                    pointerEvents: "auto",
+                    backgroundColor: "#16161a",
+                    border: "1.5px solid rgba(239, 68, 68, 0.45)",
+                    color: "#fca5a5",
+                    borderRadius: "9999px",
+                    padding: "13px 20px",
+                    fontSize: "0.88rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.65)",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#ef4444";
+                    e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.45)";
+                    e.currentTarget.style.backgroundColor = "#16161a";
+                  }}>
+                  <IconTrash size={18} color="#f87171" />
+                  <span>Hapus Pilihan</span>
+                </button>
+
                 {/* Tombol 2: Lihat Foto Terpilih (Desktop) */}
                 <button
                   onClick={handleGoToPreview}
@@ -1334,6 +1532,33 @@ function GalleryContent() {
                   </span>
                 </button>
 
+                {/* Tengah: Tombol Hapus Semua Pilihan (Mobile) */}
+                <button
+                  type="button"
+                  onClick={() => setShowClearConfirmModal(true)}
+                  aria-label="Hapus Seluruh Pilihan Foto"
+                  title="Hapus Seluruh Pilihan Foto"
+                  style={{
+                    pointerEvents: "auto",
+                    width: "48px",
+                    height: "48px",
+                    minWidth: "48px",
+                    minHeight: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#16161a",
+                    border: "1.5px solid rgba(239, 68, 68, 0.45)",
+                    color: "#fca5a5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.7), 0 0 12px rgba(239, 68, 68, 0.15)",
+                    padding: 0,
+                    flexShrink: 0,
+                  }}>
+                  <IconTrash size={20} color="#f87171" />
+                </button>
+
                 {/* Kanan Bawah: Tombol Lihat Foto Terpilih + Angka Pilihan Foto (Mobile - Permintaan 1.c & 2.a) */}
                 <button
                   onClick={handleGoToPreview}
@@ -1433,6 +1658,7 @@ function GalleryContent() {
             onToggle={toggleSelect}
             photoNotes={photoNotes}
             onOpenNote={handleOpenNoteModal}
+            onClearAll={() => setShowClearConfirmModal(true)}
           />
         )}
 
@@ -1550,6 +1776,122 @@ function GalleryContent() {
               forceUnlockScroll();
             }}
           />
+        )}
+
+        {/* 9. Modal Konfirmasi Hapus Seluruh Pilihan Foto */}
+        {showClearConfirmModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(9, 9, 11, 0.88)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              zIndex: 100000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
+            }}>
+            <div
+              style={{
+                backgroundColor: "#16161a",
+                borderRadius: "24px",
+                padding: "30px 24px",
+                maxWidth: "420px",
+                width: "100%",
+                textAlign: "center",
+                boxShadow:
+                  "0 24px 60px rgba(0, 0, 0, 0.85), 0 0 20px rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.35)",
+                animation: "fadeIn 0.2s ease-out",
+              }}>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px auto",
+                  color: "#ef4444",
+                }}>
+                <IconTrash size={28} color="#ef4444" />
+              </div>
+
+              <h3
+                style={{
+                  fontSize: "1.2rem",
+                  fontWeight: 800,
+                  color: "#ffffff",
+                  marginBottom: "8px",
+                }}>
+                Hapus Semua Pilihan Foto?
+              </h3>
+
+              <p
+                style={{
+                  color: "#a1a1aa",
+                  fontSize: "0.86rem",
+                  lineHeight: 1.5,
+                  marginBottom: "24px",
+                }}>
+                Sebanyak{" "}
+                <strong style={{ color: "#f0cf8e" }}>
+                  {selectedIds.length} foto
+                </strong>{" "}
+                yang telah Anda pilih akan dikosongkan kembali, termasuk catatan
+                khusus jika ada.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  justifyContent: "center",
+                }}>
+                <button
+                  type="button"
+                  onClick={() => setShowClearConfirmModal(false)}
+                  style={{
+                    flex: 1,
+                    height: "44px",
+                    borderRadius: "9999px",
+                    backgroundColor: "#222228",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "#ededed",
+                    fontSize: "0.88rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}>
+                  Batal
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmClearAll}
+                  style={{
+                    flex: 1,
+                    height: "44px",
+                    borderRadius: "9999px",
+                    backgroundColor: "#dc2626",
+                    border: "none",
+                    color: "#ffffff",
+                    fontSize: "0.88rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 16px rgba(220, 38, 38, 0.4)",
+                    transition: "all 0.15s ease",
+                  }}>
+                  Ya, Hapus Semua
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

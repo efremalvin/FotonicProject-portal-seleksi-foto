@@ -8,6 +8,8 @@ export interface SelectionSubmission {
   notes?: string;
   folderId?: string;
   status?: "DRAF" | "TERKUNCI";
+  sessionDate?: string | null;
+  quota?: number | string | null;
 }
 
 export interface SelectionRecord {
@@ -18,6 +20,32 @@ export interface SelectionRecord {
   selectedFileNames: string[];
   notes: string;
   folderId: string;
+  sessionDate?: string;
+  quota?: number;
+}
+
+/**
+ * Menghasilkan string waktu dalam Waktu Indonesia Barat (WIB, UTC+7)
+ * Contoh format: "YYYY-MM-DD HH:mm:ss WIB"
+ */
+function getWIBTimeString(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const p: Record<string, string> = {};
+  for (const part of parts) {
+    p[part.type] = part.value;
+  }
+
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second} WIB`;
 }
 
 /**
@@ -30,14 +58,12 @@ export async function appendSelectionToSheet(
     throw new Error("GOOGLE_SPREADSHEET_ID belum dikonfigurasi.");
   }
 
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const waktu = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const waktu = getWIBTimeString();
 
   const daftarFileStr = submission.selectedFileNames.sort().join(",\n");
   const status = submission.status || "TERKUNCI";
 
-  // Kolom A - G: Waktu, Nama Klien, Status, Jumlah Foto, Daftar File, Catatan, Folder ID
+  // Kolom A - I: Waktu, Nama Klien, Status, Jumlah Foto, Daftar File, Catatan, Folder ID, Tanggal Sesi, Kuota Foto
   const row = [
     waktu,
     submission.clientName,
@@ -46,12 +72,14 @@ export async function appendSelectionToSheet(
     daftarFileStr,
     submission.notes || "-",
     submission.folderId || "-",
+    submission.sessionDate || "-",
+    submission.quota !== undefined && submission.quota !== null ? submission.quota : "-",
   ];
 
   try {
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId,
-      range: "Sheet1!A:G",
+      range: "Sheet1!A:I",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [row],
@@ -76,7 +104,7 @@ export async function getLatestSelectionFromSheet(
   try {
     const res = await sheetsClient.spreadsheets.values.get({
       spreadsheetId,
-      range: "Sheet1!A:G",
+      range: "Sheet1!A:I",
     });
 
     const rows = res.data.values;
@@ -109,6 +137,8 @@ export async function getLatestSelectionFromSheet(
           selectedFileNames: files,
           notes: row[5] && row[5] !== "-" ? String(row[5]) : "",
           folderId: rowFolderId,
+          sessionDate: row[7] && row[7] !== "-" ? String(row[7]) : undefined,
+          quota: row[8] && row[8] !== "-" ? Number(row[8]) || undefined : undefined,
         };
       }
     }
