@@ -18,12 +18,15 @@ export async function GET(request: NextRequest) {
       getFolderDetails(folderId),
     ]);
 
+    const isExpired = Boolean((photosData as any).isExpired);
+
     return NextResponse.json({
       success: true,
       folder,
-      photos: photosData,
-      hasSubfolders: (photosData as any).hasSubfolders || false,
-      sections: (photosData as any).sections || [],
+      isExpired,
+      photos: isExpired ? [] : photosData,
+      hasSubfolders: isExpired ? false : ((photosData as any).hasSubfolders || false),
+      sections: isExpired ? [] : ((photosData as any).sections || []),
     });
   } catch (error: any) {
     return NextResponse.json(

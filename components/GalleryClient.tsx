@@ -15,6 +15,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import DraftSavedModal from "@/components/DraftSavedModal";
 import LockedSessionModal from "@/components/LockedSessionModal";
 import PhotoNoteModal from "@/components/PhotoNoteModal";
+import ExpiredLockScreen from "@/components/ExpiredLockScreen";
 import { IconTrash } from "@/components/Icons";
 import { forceUnlockScroll } from "@/lib/scrollLock";
 
@@ -82,13 +83,20 @@ function GalleryContent() {
       ? parsedUrlMax
       : folderInfo?.maxPhotos || 15;
 
+  // Status Sesi Kedaluwarsa (Expired State)
+  const [isExpired, setIsExpired] = useState<boolean>(false);
+
   // Sinkronisasi judul tab browser dengan nama klien dari Google Drive
   useEffect(() => {
     const resolvedName = urlClient || folderInfo?.clientName;
     if (resolvedName && typeof document !== "undefined") {
-      document.title = `Fotonic - Seleksi Foto ${resolvedName}`;
+      if (isExpired) {
+        document.title = `Fotonic - Akses Ditutup (${resolvedName})`;
+      } else {
+        document.title = `Fotonic - Seleksi Foto ${resolvedName}`;
+      }
     }
-  }, [urlClient, folderInfo?.clientName]);
+  }, [urlClient, folderInfo?.clientName, isExpired]);
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [hasSubfolders, setHasSubfolders] = useState<boolean>(false);
@@ -165,14 +173,25 @@ function GalleryContent() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Gagal mengambil foto.");
 
+        if (data.folder) {
+          setFolderInfo(data.folder);
+        }
+
+        // Jika sesi berstatus expired, hentikan pemuatan galeri dan alihkan ke Expired Lock Screen
+        if (data.isExpired) {
+          setIsExpired(true);
+          setIsLoading(false);
+          setShowWelcome(false);
+          setShowLockedModal(false);
+          setShowResumeDraftModal(false);
+          return;
+        }
+
         setPhotos(data.photos || []);
         setHasSubfolders(Boolean(data.hasSubfolders));
         setSections(data.sections || []);
         if (data.sections && data.sections.length > 0) {
           setActiveSectionId(data.sections[0].id);
-        }
-        if (data.folder) {
-          setFolderInfo(data.folder);
         }
 
         // Periksa riwayat sesi sebelumnya di Google Sheets (DRAF / TERKUNCI)
@@ -465,10 +484,10 @@ function GalleryContent() {
   );
 
   const handleCrossfadeStart = useCallback(() => {
-    if (!hasStarted && !hasSessionRef.current) {
+    if (!hasStarted && !hasSessionRef.current && !isExpired) {
       setShowWelcome(true);
     }
-  }, [hasStarted]);
+  }, [hasStarted, isExpired]);
 
   const handleSaveDraft = async () => {
     if (selectedIds.length === 0 || !folderId) return;
@@ -661,6 +680,16 @@ function GalleryContent() {
         </div>
         <Footer />
       </div>
+    );
+  }
+
+  if (isExpired) {
+    return (
+      <ExpiredLockScreen
+        clientName={folderInfo?.clientName || urlClient || "Klien Fotonic"}
+        sessionDate={folderInfo?.photoDate || urlDate}
+        folderName={folderInfo?.folderName}
+      />
     );
   }
 

@@ -22,6 +22,7 @@ export interface FolderSection {
 export type DrivePhotosResult = DrivePhoto[] & {
   hasSubfolders?: boolean;
   sections?: FolderSection[];
+  isExpired?: boolean;
 };
 
 export interface FolderParsedInfo {
@@ -191,6 +192,47 @@ interface CachedFolderPhotos {
 const folderPhotosCache = new Map<string, CachedFolderPhotos>();
 const inFlightPhotosPromises = new Map<string, Promise<DrivePhotosResult>>();
 
+/**
+ * Memvalidasi kondisi apakah sesi foto klien berstatus expired (kedaluwarsa).
+ *
+ * Syarat Kondisi Expired:
+ * 1. Di dalam folder tersebut TIDAK DITEMUKAN file foto aktif (mimeType gambar langsung di root).
+ * 2. Terdapat sub-folder bernama persis "Expired" (case-insensitive) yang menandai sesi diarsipkan,
+ *    atau HANYA ADA satu sub-folder bernama "Expired".
+ */
+export function check_is_expired(
+  items: Array<{ name?: string | null; mimeType?: string | null }>
+): boolean {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return false;
+  }
+
+  const isFolder = (item: { mimeType?: string | null }) =>
+    item.mimeType === "application/vnd.google-apps.folder";
+
+  const isImage = (item: { mimeType?: string | null }) =>
+    Boolean(item.mimeType && item.mimeType.toLowerCase().startsWith("image/"));
+
+  // Cari apakah ada sub-folder dengan nama "Expired" (case-insensitive)
+  const hasExpiredFolder = items.some(
+    (item) => isFolder(item) && item.name?.trim().toLowerCase() === "expired"
+  );
+
+  if (!hasExpiredFolder) {
+    return false;
+  }
+
+  // Cek apakah ada file foto aktif langsung di root folder
+  const activePhotos = items.filter((item) => isImage(item));
+
+  // Jika tidak ditemukan file foto aktif di level ini
+  if (activePhotos.length === 0) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function getPhotosFromFolder(
   rawFolderId: string,
 ): Promise<DrivePhotosResult> {
@@ -211,24 +253,39 @@ export async function getPhotosFromFolder(
 
   const fetchPromise = (async (): Promise<DrivePhotosResult> => {
     try {
-      // Jalankan query subfolder & foto root secara PARALEL (menghemat 1 round-trip penuh ke Google Drive API)
-      const [subfolderRes, rootImagesRes] = await Promise.all([
-        driveClient.files.list({
-          q: `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-          fields: "files(id, name)",
-          pageSize: 100,
-          orderBy: "name",
-        }),
-        driveClient.files.list({
-          q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
-          fields: "files(id, name, mimeType, thumbnailLink, imageMediaMetadata(width, height, rotation))",
-          pageSize: 500,
-          orderBy: "name",
-        }),
-      ]);
+      // 1. Ambil seluruh item langsung di dalam folder (membaca mimeType apakah folder atau gambar)
+      const directItemsRes = await driveClient.files.list({
+        q: `'${folderId}' in parents and trashed = false`,
+        fields: "files(id, name, mimeType, thumbnailLink, imageMediaMetadata(width, height, rotation))",
+        pageSize: 1000,
+        orderBy: "name",
+      });
 
-      const allSubfolders = subfolderRes.data.files || [];
-      const rootFiles = rootImagesRes.data.files || [];
+      const allItems = directItemsRes.data.files || [];
+
+      // 2. Evaluasi Kondisi Expired Sesi Klien
+      const isExpired = check_is_expired(allItems);
+      if (isExpired) {
+        const expiredResult: DrivePhotosResult = [];
+        expiredResult.isExpired = true;
+        expiredResult.hasSubfolders = false;
+        expiredResult.sections = [];
+
+        folderPhotosCache.set(folderId, {
+          photos: expiredResult,
+          timestamp: Date.now(),
+        });
+
+        return expiredResult;
+      }
+
+      // 3. Pisahkan sub-folder dan file foto root aktif
+      const allSubfolders = allItems.filter(
+        (f) => f.mimeType === "application/vnd.google-apps.folder"
+      );
+      const rootFiles = allItems.filter(
+        (f) => f.mimeType && f.mimeType.toLowerCase().startsWith("image/")
+      );
 
       // Simpan informasi folder Cover ke cache agar /api/banner tidak perlu query ulang
       const coverFolder = allSubfolders.find(
