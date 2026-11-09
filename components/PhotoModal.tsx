@@ -23,6 +23,8 @@ interface PhotoModalProps {
   photoNotes?: Record<string, string>;
   onOpenNote?: (id: string, name: string) => void;
   isQuotaFull?: boolean;
+  hideSelection?: boolean;
+  maxResolution?: boolean;
 }
 
 export default function PhotoModal({
@@ -36,12 +38,16 @@ export default function PhotoModal({
   photoNotes = {},
   onOpenNote,
   isQuotaFull = false,
+  hideSelection = false,
+  maxResolution = false,
 }: PhotoModalProps) {
-  const safeIndex = photos && photos.length > 0 ? Math.max(0, Math.min(currentIndex, photos.length - 1)) : 0;
+  const safeIndex =
+    photos && photos.length > 0 ? Math.max(0, Math.min(currentIndex, photos.length - 1)) : 0;
   const currentPhoto = photos && photos.length > 0 ? photos[safeIndex] : null;
   const isSelected = currentPhoto ? selectedIds.includes(currentPhoto.id) : false;
   const currentNote = currentPhoto ? photoNotes[currentPhoto.id] || "" : "";
   const hasNote = Boolean(currentNote && currentNote.trim().length > 0);
+  const maxZoomLimit = maxResolution ? 5 : 4;
 
   // Status Zoom & Pan Independen (Sinkron dengan Ref DOM Langsung agar 60fps Tanpa Re-render Lag Saat Geser/Cubit)
   const [zoom, setZoom] = useState(1);
@@ -58,8 +64,10 @@ export default function PhotoModal({
   // Transisi Drop To Black antar gambar (200ms)
   const [isBlackout, setIsBlackout] = useState(false);
 
-  // Status Loading Resolusi Penuh
+  // Status Loading Progressive: Stage 1 (Thumb) -> Stage 2 (2K HD) -> Stage 3 (Max Original Resolution =s0)
   const [isFullLoaded, setIsFullLoaded] = useState(false);
+  const [maxResSrc, setMaxResSrc] = useState<string | null>(null);
+  const [isMaxLoading, setIsMaxLoading] = useState(false);
 
   // Touch References untuk Ketuk Dua Kali Instan (Tanpa Hold), Pinch Zoom, & Swipe
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -73,20 +81,23 @@ export default function PhotoModal({
   const lastClickTimeRef = useRef<number>(0);
 
   // Helper mengaplikasikan transformasi langsung ke elemen DOM gambar (0ms latency tanpa React re-render)
-  const applyTransformToDom = useCallback((z: number, p: { x: number; y: number }, animate: boolean) => {
-    const transformStr = `translate3d(${p.x}px, ${p.y}px, 0) scale(${z})`;
-    if (fullImgRef.current) {
-      fullImgRef.current.style.transition = animate
-        ? "opacity 160ms ease-out, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
-        : "opacity 160ms ease-out";
-      fullImgRef.current.style.transform = transformStr;
-    }
-    if (thumbImgRef.current) {
-      thumbImgRef.current.style.transform = transformStr;
-    }
-  }, []);
+  const applyTransformToDom = useCallback(
+    (z: number, p: { x: number; y: number }, animate: boolean) => {
+      const transformStr = `translate3d(${p.x}px, ${p.y}px, 0) scale(${z})`;
+      if (fullImgRef.current) {
+        fullImgRef.current.style.transition = animate
+          ? "opacity 160ms ease-out, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
+          : "opacity 160ms ease-out";
+        fullImgRef.current.style.transform = transformStr;
+      }
+      if (thumbImgRef.current) {
+        thumbImgRef.current.style.transform = transformStr;
+      }
+    },
+    []
+  );
 
-    // Otomatis sinkronkan index atau tutup jika list foto kosong
+  // Otomatis sinkronkan index atau tutup jika list foto kosong
   useEffect(() => {
     if (isOpen) {
       if (!photos || photos.length === 0) {
@@ -112,7 +123,51 @@ export default function PhotoModal({
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setIsFullLoaded(false);
+    setMaxResSrc(null);
+    setIsMaxLoading(false);
   }, [currentIndex]);
+
+  // Stage 3: Upgrade Progresif ke Resolusi Maksimal Asli (&max=1 / =s0) di Background Worker (Zero UI Lag!)
+  useEffect(() => {
+    if (!isOpen || !maxResolution || !isFullLoaded || !currentPhoto) return;
+
+    let cancelled = false;
+    const targetMaxUrl = `/api/thumbnail?id=${currentPhoto.id}&max=1`;
+
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      setIsMaxLoading(true);
+      const maxImg = new Image();
+      maxImg.decoding = "async";
+      maxImg.src = targetMaxUrl;
+
+      const finishMaxUpgrade = () => {
+        if (cancelled) return;
+        setMaxResSrc(targetMaxUrl);
+        setIsMaxLoading(false);
+      };
+
+      if (typeof maxImg.decode === "function") {
+        maxImg
+          .decode()
+          .then(finishMaxUpgrade)
+          .catch(() => {
+            // Jika decode() gagal pada browser lama namun gambar berhasil onload, tetap gunakan
+            if (!cancelled) setIsMaxLoading(false);
+          });
+      } else {
+        maxImg.onload = finishMaxUpgrade;
+        maxImg.onerror = () => {
+          if (!cancelled) setIsMaxLoading(false);
+        };
+      }
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, maxResolution, isFullLoaded, currentPhoto]);
 
   // Preload foto sebelahnya (kiri & kanan) setelah foto saat ini selesai dimuat agar swipe berikutnya instan
   useEffect(() => {
@@ -121,8 +176,9 @@ export default function PhotoModal({
     const timers = neighbors.map((neighbor, i) =>
       setTimeout(() => {
         const preloader = new Image();
+        preloader.decoding = "async";
         preloader.src = `/api/thumbnail?id=${neighbor.id}&full=1`;
-      }, 150 * (i + 1))
+      }, 180 * (i + 1))
     );
     return () => timers.forEach(clearTimeout);
   }, [isOpen, isFullLoaded, currentIndex, photos]);
@@ -149,7 +205,7 @@ export default function PhotoModal({
         }, 30);
       }, 100);
     },
-    [currentIndex, photos.length, onNavigate, isBlackout],
+    [currentIndex, photos.length, onNavigate, isBlackout]
   );
 
   // Navigasi Keyboard (Panah Kiri, Kanan, Escape, Zoom +/-)
@@ -168,7 +224,7 @@ export default function PhotoModal({
           changePhotoWithDropToBlack(currentIndex + 1);
         }
       } else if (e.key === "+" || e.key === "=") {
-        const next = Math.min(4, Math.round((zoomRef.current + 0.35) * 10) / 10);
+        const next = Math.min(maxZoomLimit, Math.round((zoomRef.current + 0.35) * 10) / 10);
         zoomRef.current = next;
         setZoom(next);
         applyTransformToDom(next, panRef.current, true);
@@ -186,7 +242,15 @@ export default function PhotoModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, currentIndex, photos.length, changePhotoWithDropToBlack, onClose, applyTransformToDom]);
+  }, [
+    isOpen,
+    currentIndex,
+    photos.length,
+    changePhotoWithDropToBlack,
+    onClose,
+    applyTransformToDom,
+    maxZoomLimit,
+  ]);
 
   if (!isOpen || !currentPhoto) return null;
 
@@ -196,7 +260,10 @@ export default function PhotoModal({
     e.stopPropagation();
 
     const delta = e.deltaY < 0 ? 0.35 : -0.35;
-    const next = Math.min(4, Math.max(1, Math.round((zoomRef.current + delta) * 100) / 100));
+    const next = Math.min(
+      maxZoomLimit,
+      Math.max(1, Math.round((zoomRef.current + delta) * 100) / 100)
+    );
     zoomRef.current = next;
     if (next === 1) {
       panRef.current = { x: 0, y: 0 };
@@ -217,8 +284,14 @@ export default function PhotoModal({
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
         nextPan = {
-          x: Math.max(-window.innerWidth * 0.7, Math.min(window.innerWidth * 0.7, (centerX - clientX) * 1.3)),
-          y: Math.max(-window.innerHeight * 0.7, Math.min(window.innerHeight * 0.7, (centerY - clientY) * 1.3)),
+          x: Math.max(
+            -window.innerWidth * 0.7,
+            Math.min(window.innerWidth * 0.7, (centerX - clientX) * 1.3)
+          ),
+          y: Math.max(
+            -window.innerHeight * 0.7,
+            Math.min(window.innerHeight * 0.7, (centerY - clientY) * 1.3)
+          ),
         };
       }
       zoomRef.current = nextZoom;
@@ -260,7 +333,7 @@ export default function PhotoModal({
 
     const moveDist = Math.hypot(
       e.clientX - mouseDownPosRef.current.x,
-      e.clientY - mouseDownPosRef.current.y,
+      e.clientY - mouseDownPosRef.current.y
     );
     const duration = Date.now() - mouseDownPosRef.current.time;
 
@@ -284,7 +357,7 @@ export default function PhotoModal({
       // Cubit Lebar (Pinch to zoom)
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
+        e.touches[0].clientY - e.touches[1].clientY
       );
       pinchStartDistRef.current = dist;
       pinchStartZoomRef.current = zoomRef.current;
@@ -298,7 +371,10 @@ export default function PhotoModal({
       };
       if (zoomRef.current > 1) {
         isDraggingRef.current = true;
-        dragStartRef.current = { x: touch.clientX - panRef.current.x, y: touch.clientY - panRef.current.y };
+        dragStartRef.current = {
+          x: touch.clientX - panRef.current.x,
+          y: touch.clientY - panRef.current.y,
+        };
       }
     }
   };
@@ -307,10 +383,10 @@ export default function PhotoModal({
     if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY,
+        e.touches[0].clientY - e.touches[1].clientY
       );
       const ratio = dist / pinchStartDistRef.current;
-      const nextZoom = Math.min(4, Math.max(1, pinchStartZoomRef.current * ratio));
+      const nextZoom = Math.min(maxZoomLimit, Math.max(1, pinchStartZoomRef.current * ratio));
       zoomRef.current = nextZoom;
       if (nextZoom === 1) {
         panRef.current = { x: 0, y: 0 };
@@ -351,7 +427,7 @@ export default function PhotoModal({
       const timeSinceLastTap = now - lastTapTimeRef.current;
       const distFromLastTap = Math.hypot(
         touch.clientX - lastTapPosRef.current.x,
-        touch.clientY - lastTapPosRef.current.y,
+        touch.clientY - lastTapPosRef.current.y
       );
 
       if (timeSinceLastTap > 40 && timeSinceLastTap < 400 && distFromLastTap < 45) {
@@ -366,7 +442,12 @@ export default function PhotoModal({
     }
 
     // Geser swipe navigasi foto saat zoom normal (1x)
-    if (zoomRef.current === 1 && Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && deltaTime < 450) {
+    if (
+      zoomRef.current === 1 &&
+      Math.abs(deltaX) > 40 &&
+      Math.abs(deltaX) > Math.abs(deltaY) * 1.3 &&
+      deltaTime < 450
+    ) {
       if (deltaX < 0 && currentIndex < photos.length - 1) {
         changePhotoWithDropToBlack(currentIndex + 1);
       } else if (deltaX > 0 && currentIndex > 0) {
@@ -376,6 +457,8 @@ export default function PhotoModal({
 
     touchStartRef.current = null;
   };
+
+  const activeFullSrc = maxResSrc || `/api/thumbnail?id=${currentPhoto.id}&full=1`;
 
   return (
     <div
@@ -394,7 +477,7 @@ export default function PhotoModal({
         justifyContent: "center",
       }}>
       {/* ========================================================
-          1. POJOK KIRI ATAS: NAMA FILE
+          1. POJOK KIRI ATAS: NAMA FILE + BADGE RESOLUSI MAKSIMAL
           Dengan Background Transparan Gelap Mewah & Border Gold
           ======================================================== */}
       <div
@@ -403,15 +486,15 @@ export default function PhotoModal({
           position: "absolute",
           top: "16px",
           left: "16px",
-          backgroundColor: "rgba(18, 18, 22, 0.85)",
+          backgroundColor: "rgba(18, 18, 22, 0.88)",
           color: "#ffffff",
           border: "1px solid rgba(214, 168, 90, 0.35)",
           borderRadius: "12px",
-          padding: "8px 16px",
-          fontSize: "0.84rem",
+          padding: "8px 14px",
+          fontSize: "0.82rem",
           fontWeight: 700,
           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.7)",
-          maxWidth: "calc(60vw - 32px)",
+          maxWidth: "calc(64vw - 24px)",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -422,6 +505,26 @@ export default function PhotoModal({
         }}>
         <IconImage size={16} color="#d6a85a" style={{ flexShrink: 0 }} />
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{currentPhoto.name}</span>
+        {maxResolution && isFullLoaded && (
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: "0.62rem",
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+              padding: "2px 6px",
+              borderRadius: "6px",
+              backgroundColor: maxResSrc
+                ? "rgba(214, 168, 90, 0.22)"
+                : "rgba(255, 255, 255, 0.08)",
+              color: maxResSrc ? "#f0cf8e" : "#a1a1aa",
+              border: maxResSrc
+                ? "1px solid rgba(214, 168, 90, 0.5)"
+                : "1px solid rgba(255, 255, 255, 0.12)",
+            }}>
+            {maxResSrc ? "MAX RES" : isMaxLoading ? "HD → MAX..." : "HD"}
+          </span>
+        )}
       </div>
 
       {/* ========================================================
@@ -433,7 +536,7 @@ export default function PhotoModal({
           position: "absolute",
           top: "16px",
           right: "16px",
-          backgroundColor: "rgba(18, 18, 22, 0.85)",
+          backgroundColor: "rgba(18, 18, 22, 0.88)",
           color: "#f0cf8e",
           border: "1px solid rgba(214, 168, 90, 0.35)",
           borderRadius: "9999px",
@@ -449,9 +552,9 @@ export default function PhotoModal({
 
       {/* ========================================================
           3. AREA PANGGUNG FOTO UTAMA
-          - Resolusi maksimal sesuai sumber (full=1)
-          - Zoom via pinch to zoom atau double-tap instan tanpa hold
-          - Transisi drop to black 200ms
+          - Stage 1: Thumbnail instan dari cache
+          - Stage 2: 2K HD cepat (full=1)
+          - Stage 3: Resolusi Maksimal Asli (max=1 / =s0) tanpa lag via async decode()
           ======================================================== */}
       <div
         onWheel={handleWheel}
@@ -488,7 +591,6 @@ export default function PhotoModal({
               zIndex: 25,
               pointerEvents: "none",
             }}>
-            {/* Animasi Spinner Emas Fotonic */}
             <div
               style={{
                 width: "38px",
@@ -531,17 +633,17 @@ export default function PhotoModal({
               transformOrigin: "center center",
               position: "absolute",
               pointerEvents: "none",
-              opacity: isBlackout ? 0 : 0.8,
+              opacity: isBlackout ? 0 : 0.85,
               transition: isBlackout ? "opacity 100ms ease-in" : "none",
             }}
           />
         )}
 
-        {/* Gambar Resolusi Maksimal Asli dari Sumber Google Drive */}
+        {/* Gambar Resolusi Penuh / Maksimal Asli dari Sumber Google Drive */}
         <img
           ref={fullImgRef}
           key={currentPhoto.id}
-          src={`/api/thumbnail?id=${currentPhoto.id}&full=1`}
+          src={activeFullSrc}
           alt={currentPhoto.name}
           decoding="async"
           onLoad={() => setIsFullLoaded(true)}
@@ -576,7 +678,7 @@ export default function PhotoModal({
           position: "absolute",
           bottom: "16px",
           left: "16px",
-          backgroundColor: "rgba(18, 18, 22, 0.85)",
+          backgroundColor: "rgba(18, 18, 22, 0.88)",
           color: "#f0cf8e",
           border: "1px solid rgba(214, 168, 90, 0.35)",
           borderRadius: "10px",
@@ -612,7 +714,7 @@ export default function PhotoModal({
           gap: "10px",
           zIndex: 60,
         }}>
-        {/* Tombol Catatan Khusus Foto (Muncul jika onOpenNote tersedia) */}
+        {/* Tombol Catatan / Komentar Khusus Foto */}
         {onOpenNote && (
           <button
             onClick={() => {
@@ -625,10 +727,10 @@ export default function PhotoModal({
                 ? "Pilihan catatan dinonaktifkan (kuota foto telah terpenuhi)"
                 : hasNote
                 ? `Catatan: "${currentNote}"`
-                : "Tambah Catatan Khusus untuk Foto Ini"
+                : "Tambah Catatan / Komentar untuk Foto Ini"
             }
             style={{
-              backgroundColor: hasNote ? "rgba(214, 168, 90, 0.22)" : "rgba(18, 18, 22, 0.85)",
+              backgroundColor: hasNote ? "rgba(214, 168, 90, 0.22)" : "rgba(18, 18, 22, 0.88)",
               color: isQuotaFull && !isSelected ? "rgba(240, 207, 142, 0.35)" : "#f0cf8e",
               border: hasNote
                 ? "1.5px solid #d6a85a"
@@ -636,7 +738,7 @@ export default function PhotoModal({
                 ? "1px solid rgba(255, 255, 255, 0.12)"
                 : "1px solid rgba(214, 168, 90, 0.35)",
               borderRadius: "9999px",
-              padding: "8px 14px",
+              padding: "9px 16px",
               display: "flex",
               alignItems: "center",
               gap: "6px",
@@ -645,7 +747,8 @@ export default function PhotoModal({
               fontSize: "0.8rem",
               fontWeight: 700,
               boxShadow: isQuotaFull && !isSelected ? "none" : "0 4px 16px rgba(0, 0, 0, 0.7)",
-              transition: "transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.2s ease",
+              transition:
+                "transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.2s ease",
             }}
             onMouseDown={(e) => {
               if (!isQuotaFull || isSelected) {
@@ -660,54 +763,65 @@ export default function PhotoModal({
             }}
             onTouchEnd={(e) => (e.currentTarget.style.transform = "scale(1)")}>
             {hasNote ? (
-              <IconPaper size={17} color={isQuotaFull && !isSelected ? "rgba(240, 207, 142, 0.35)" : "#f0cf8e"} />
+              <IconPaper
+                size={17}
+                color={isQuotaFull && !isSelected ? "rgba(240, 207, 142, 0.35)" : "#f0cf8e"}
+              />
             ) : (
-              <IconPaperPlus size={17} color={isQuotaFull && !isSelected ? "rgba(214, 168, 90, 0.35)" : "#d6a85a"} />
+              <IconPaperPlus
+                size={17}
+                color={isQuotaFull && !isSelected ? "rgba(214, 168, 90, 0.35)" : "#d6a85a"}
+              />
             )}
-            {hasNote ? (
-              <span style={{ fontSize: "0.74rem", maxWidth: "80px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                Catatan
-              </span>
-            ) : (
-              <span style={{ fontSize: "0.74rem" }}>Catatan</span>
-            )}
+            <span
+              style={{
+                fontSize: "0.76rem",
+                maxWidth: "110px",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}>
+              {hideSelection ? (hasNote ? "Edit Komentar" : "Beri Komentar") : "Catatan"}
+            </span>
           </button>
         )}
 
         {/* Tombol Pilih Foto */}
-        <button
-          onClick={() => {
-            if (isQuotaFull && !isSelected) return;
-            onToggle(currentPhoto.id);
-          }}
-          title={isSelected ? "Batalkan Pilihan Foto Ini" : "Pilih Foto Ini"}
-          style={{
-            background: isSelected
-              ? "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)"
-              : "rgba(18, 18, 22, 0.85)",
-            color: isSelected ? "#09090b" : "#f0cf8e",
-            border: isSelected ? "none" : "1px solid rgba(214, 168, 90, 0.35)",
-            borderRadius: "9999px",
-            padding: "8px 18px",
-            fontSize: "0.84rem",
-            fontWeight: 800,
-            cursor: isQuotaFull && !isSelected ? "not-allowed" : "pointer",
-            opacity: isQuotaFull && !isSelected ? 0.45 : 1,
-            boxShadow: isSelected
-              ? "0 4px 16px rgba(214, 168, 90, 0.45)"
-              : "0 4px 16px rgba(0, 0, 0, 0.7)",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            transition: "transform 0.15s ease",
-          }}
-          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
-          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          onTouchStart={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
-          onTouchEnd={(e) => (e.currentTarget.style.transform = "scale(1)")}>
-          <span>{isSelected ? "✓" : "+"}</span>
-          <span>{isSelected ? "Terpilih" : "Pilih"}</span>
-        </button>
+        {!hideSelection && (
+          <button
+            onClick={() => {
+              if (isQuotaFull && !isSelected) return;
+              onToggle(currentPhoto.id);
+            }}
+            title={isSelected ? "Batalkan Pilihan Foto Ini" : "Pilih Foto Ini"}
+            style={{
+              background: isSelected
+                ? "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)"
+                : "rgba(18, 18, 22, 0.88)",
+              color: isSelected ? "#09090b" : "#f0cf8e",
+              border: isSelected ? "none" : "1px solid rgba(214, 168, 90, 0.35)",
+              borderRadius: "9999px",
+              padding: "8px 18px",
+              fontSize: "0.84rem",
+              fontWeight: 800,
+              cursor: isQuotaFull && !isSelected ? "not-allowed" : "pointer",
+              opacity: isQuotaFull && !isSelected ? 0.45 : 1,
+              boxShadow: isSelected
+                ? "0 4px 16px rgba(214, 168, 90, 0.45)"
+                : "0 4px 16px rgba(0, 0, 0, 0.7)",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "transform 0.15s ease",
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onTouchStart={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
+            onTouchEnd={(e) => (e.currentTarget.style.transform = "scale(1)")}>
+            <span>{isSelected ? "✓" : "+"}</span>
+            <span>{isSelected ? "Terpilih" : "Pilih"}</span>
+          </button>
+        )}
       </div>
     </div>
   );

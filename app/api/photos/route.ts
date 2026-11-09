@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPhotosFromFolder, getFolderDetails } from "@/lib/google/drive";
+import {
+  getPhotosFromFolder,
+  getEditedPhotosFromFolder,
+  getFolderDetails,
+} from "@/lib/google/drive";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const folderId = searchParams.get("folder_id");
+  const mode = searchParams.get("mode");
 
   if (!folderId) {
     return NextResponse.json(
@@ -14,16 +19,20 @@ export async function GET(request: NextRequest) {
 
   try {
     const [photosData, folder] = await Promise.all([
-      getPhotosFromFolder(folderId),
+      mode === "edited"
+        ? getEditedPhotosFromFolder(folderId)
+        : getPhotosFromFolder(folderId),
       getFolderDetails(folderId),
     ]);
 
     const isExpired = Boolean((photosData as any).isExpired);
+    const noEditedFolder = Boolean((photosData as any).noEditedFolder);
 
     return NextResponse.json({
       success: true,
       folder,
       isExpired,
+      noEditedFolder,
       photos: isExpired ? [] : photosData,
       hasSubfolders: isExpired ? false : ((photosData as any).hasSubfolders || false),
       sections: isExpired ? [] : ((photosData as any).sections || []),

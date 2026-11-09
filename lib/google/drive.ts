@@ -23,6 +23,7 @@ export type DrivePhotosResult = DrivePhoto[] & {
   hasSubfolders?: boolean;
   sections?: FolderSection[];
   isExpired?: boolean;
+  noEditedFolder?: boolean;
 };
 
 export interface FolderParsedInfo {
@@ -181,8 +182,9 @@ export async function getFolderDetails(rawFolderId: string): Promise<FolderParse
 // Cache URL thumbnail Google Drive untuk akses cepat tanpa hit API ulang
 export const driveThumbnailMap = new Map<string, string>();
 
-// Cache ID subfolder "Cover" per parent folderId agar getBannerPhoto instan
+// Cache ID subfolder "Cover" dan "Edited" per parent folderId
 const coverFolderCache = new Map<string, string | null>();
+const editedFolderCache = new Map<string, string | null>();
 
 // In-memory cache daftar foto per folder & deduplikasi request paralel
 interface CachedFolderPhotos {
@@ -287,16 +289,23 @@ export async function getPhotosFromFolder(
         (f) => f.mimeType && f.mimeType.toLowerCase().startsWith("image/")
       );
 
-      // Simpan informasi folder Cover ke cache agar /api/banner tidak perlu query ulang
+      // Simpan informasi folder Cover & Edited ke cache
       const coverFolder = allSubfolders.find(
         (f) => f.name && f.name.trim().toLowerCase() === "cover"
       );
       coverFolderCache.set(folderId, coverFolder?.id || null);
 
-      // Filter dan abaikan folder "Cover" (case-insensitive) untuk ditampilkan di galeri
-      const gallerySubfolders = allSubfolders.filter(
-        (f) => f.name && f.name.trim().toLowerCase() !== "cover"
+      const editedFolder = allSubfolders.find(
+        (f) => f.name && f.name.trim().toLowerCase() === "edited"
       );
+      editedFolderCache.set(folderId, editedFolder?.id || null);
+
+      // Filter dan abaikan folder "Cover", "Edited", dan "Expired" (case-insensitive) untuk ditampilkan di galeri utama
+      const gallerySubfolders = allSubfolders.filter((f) => {
+        if (!f.name) return false;
+        const lower = f.name.trim().toLowerCase();
+        return lower !== "cover" && lower !== "edited" && lower !== "expired";
+      });
 
       const helperParseFile = (
         file: drive_v3.Schema$File,
@@ -441,9 +450,56 @@ export async function getBannerPhoto(
 
     const targetFolderId = coverId ? coverId : parentFolderId;
     const photos = await getPhotosFromFolder(targetFolderId);
-    return photos.length > 0 ? photos[0] : null;
+    if (photos.length > 0) return photos[0];
+
+    const editedId = editedFolderCache.get(parentFolderId);
+    if (editedId) {
+      const editedPhotos = await getPhotosFromFolder(editedId);
+      if (editedPhotos.length > 0) return editedPhotos[0];
+    }
+    return null;
   } catch (error) {
     console.error("Gagal mendeteksi foto banner:", error);
     return null;
+  }
+}
+
+/**
+ * Mengambil foto-foto khusus dari subfolder "Edited" di dalam folder utama klien
+ */
+export async function getEditedPhotosFromFolder(
+  rawParentFolderId: string,
+): Promise<DrivePhotosResult> {
+  const parentFolderId = extractFolderId(rawParentFolderId);
+
+  try {
+    let editedId = editedFolderCache.get(parentFolderId);
+
+    if (editedId === undefined) {
+      const subRes = await driveClient.files.list({
+        q: `'${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        fields: "files(id, name)",
+        pageSize: 100,
+      });
+      const folders = subRes.data.files || [];
+      const editedFolder = folders.find(
+        (f) => f.name && f.name.trim().toLowerCase() === "edited"
+      );
+      editedId = editedFolder?.id || null;
+      editedFolderCache.set(parentFolderId, editedId);
+    }
+
+    if (!editedId) {
+      const emptyResult: DrivePhotosResult = [];
+      emptyResult.noEditedFolder = true;
+      emptyResult.hasSubfolders = false;
+      emptyResult.sections = [];
+      return emptyResult;
+    }
+
+    return await getPhotosFromFolder(editedId);
+  } catch (error) {
+    console.error("Gagal mengambil daftar foto dari subfolder Edited:", error);
+    throw new Error("Gagal membaca folder Edited di Google Drive.");
   }
 }

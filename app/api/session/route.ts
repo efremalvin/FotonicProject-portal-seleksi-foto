@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLatestSelectionFromSheet } from "@/lib/google/sheets";
-import { getPhotosFromFolder } from "@/lib/google/drive";
-import { parseCombinedNotes } from "@/lib/notesHelper";
+import {
+  getLatestSelectionFromSheet,
+  getLatestEditedReviewFromSheet,
+} from "@/lib/google/sheets";
+import {
+  getPhotosFromFolder,
+  getEditedPhotosFromFolder,
+} from "@/lib/google/drive";
+import {
+  parseCombinedNotes,
+  parsePhotoCommentsOnly,
+} from "@/lib/notesHelper";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const folderId = searchParams.get("folder_id");
+  const mode = searchParams.get("mode");
 
   if (!folderId) {
     return NextResponse.json(
@@ -15,6 +25,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (mode === "edited") {
+      const record = await getLatestEditedReviewFromSheet(folderId);
+
+      if (!record) {
+        return NextResponse.json({
+          hasPreviousSession: false,
+        });
+      }
+
+      const photosInFolder = await getEditedPhotosFromFolder(folderId);
+      const photoNotes = parsePhotoCommentsOnly(
+        record.photoCommentsRaw,
+        photosInFolder,
+      );
+
+      return NextResponse.json({
+        hasPreviousSession: true,
+        status: record.status, // "DRAF" | "TERKUNCI"
+        waktu: record.waktu,
+        clientName: record.clientName,
+        sessionDate: record.sessionDate,
+        count: record.count,
+        notes: record.overallNotes,
+        photoNotes,
+        photoCommentsRaw: record.photoCommentsRaw,
+      });
+    }
+
     const record = await getLatestSelectionFromSheet(folderId);
 
     if (!record) {

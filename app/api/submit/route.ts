@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPhotosFromFolder, getFolderDetails } from "@/lib/google/drive";
-import { appendSelectionToSheet } from "@/lib/google/sheets";
-import { formatCombinedNotes } from "@/lib/notesHelper";
+import {
+  getPhotosFromFolder,
+  getEditedPhotosFromFolder,
+  getFolderDetails,
+} from "@/lib/google/drive";
+import {
+  appendSelectionToSheet,
+  appendEditedReviewToSheet,
+} from "@/lib/google/sheets";
+import {
+  formatCombinedNotes,
+  formatPhotoCommentsOnly,
+} from "@/lib/notesHelper";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,9 +26,72 @@ export async function POST(request: NextRequest) {
       isDraft,
       photoDate,
       sessionDate,
+      mode,
     } = body;
 
-    if (!folderId || !selectedFileIds || !Array.isArray(selectedFileIds)) {
+    if (!folderId) {
+      return NextResponse.json(
+        { error: "Format permintaan tidak valid" },
+        { status: 400 },
+      );
+    }
+
+    // ========================================================
+    // MODE EDITED: Konfirmasi / Komentar Hasil Editan Foto (Tab "Edited")
+    // ========================================================
+    if (mode === "edited") {
+      const editedPhotos = await getEditedPhotosFromFolder(folderId);
+      if (editedPhotos.length === 0) {
+        return NextResponse.json(
+          { error: "Tidak ada foto hasil editan di dalam folder Edited." },
+          { status: 400 },
+        );
+      }
+
+      const photoCommentsFormatted = formatPhotoCommentsOnly(
+        photoNotes && typeof photoNotes === "object" ? photoNotes : {},
+        editedPhotos,
+      );
+
+      let resolvedDate = photoDate || sessionDate || null;
+      if (!resolvedDate) {
+        try {
+          const folderDetails = await getFolderDetails(folderId);
+          resolvedDate = folderDetails.photoDate;
+        } catch {
+          // Fallback
+        }
+      }
+
+      const submissionStatus = isDraft ? "DRAF" : "TERKUNCI";
+
+      await appendEditedReviewToSheet({
+        clientName: clientName || "Klien Fotonic",
+        totalEditedPhotos: editedPhotos.length,
+        photoCommentsFormatted,
+        overallNotes: typeof notes === "string" ? notes : "",
+        folderId,
+        status: submissionStatus,
+        sessionDate: resolvedDate || "-",
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: isDraft
+          ? "Komentar hasil editan berhasil disimpan sementara"
+          : "Hasil editan berhasil dikonfirmasi & dikunci",
+        status: submissionStatus,
+        count: editedPhotos.length,
+        fileNames: editedPhotos.map((p) => p.name),
+        photoCommentsFormatted,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ========================================================
+    // MODE DEFAULT: Seleksi Foto Awal (Tab "Sheet1")
+    // ========================================================
+    if (!selectedFileIds || !Array.isArray(selectedFileIds)) {
       return NextResponse.json(
         { error: "Format permintaan tidak valid" },
         { status: 400 },

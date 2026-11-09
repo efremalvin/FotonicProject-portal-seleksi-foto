@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 
 interface LoadingScreenProps {
@@ -21,12 +21,21 @@ export default function LoadingScreen({
   const [progress, setProgress] = useState(12);
   const [shouldRender, setShouldRender] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const hasLockedRef = useRef(false);
+
+  const releaseScrollLockOnce = () => {
+    if (hasLockedRef.current) {
+      hasLockedRef.current = false;
+      unlockScroll();
+    }
+  };
 
   useEffect(() => {
     // Kunci scroll halaman saat loading screen aktif
     lockScroll();
+    hasLockedRef.current = true;
     return () => {
-      unlockScroll();
+      releaseScrollLockOnce();
     };
   }, []);
 
@@ -43,13 +52,14 @@ export default function LoadingScreen({
     };
   }, []);
 
-  // Ketika data nama client & foto sudah selesai terdeteksi/terproses
+  // Ketika proses loading selesai (baik sukses maupun error)
   useEffect(() => {
-    if (!isLoading && folderDetected) {
+    if (!isLoading) {
       setProgress(100);
-      // Beri jeda sejenak agar user sempat melihat nama dan "Sesi [Nama] Siap ✨"
       const holdTimer = setTimeout(() => {
-        // Mulai transisi Crossfade: Tampilkan menu selamat datang secara bersamaan
+        // Lepas kunci scroll dari LoadingScreen tepat saat crossfade dimulai
+        // agar halaman (terutama /edited atau mobile tanpa welcome modal) langsung bisa di-scroll
+        releaseScrollLockOnce();
         setIsFadingOut(true);
         if (onCrossfadeStart) {
           onCrossfadeStart();
@@ -59,10 +69,10 @@ export default function LoadingScreen({
         const removeTimer = setTimeout(() => {
           setShouldRender(false);
           if (onFinished) onFinished();
-        }, 450);
+        }, 420);
 
         return () => clearTimeout(removeTimer);
-      }, 180);
+      }, folderDetected ? 160 : 80);
 
       return () => clearTimeout(holdTimer);
     }
@@ -83,7 +93,7 @@ export default function LoadingScreen({
         justifyContent: "center",
         padding: "24px",
         opacity: isFadingOut ? 0 : 1,
-        transition: "opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1)",
         pointerEvents: isFadingOut ? "none" : "auto",
       }}>
       {/* Ambient Lighting di Belakang Icon Shutter (Gradien Halus Bebas Blur Filter Berat) */}
@@ -108,7 +118,7 @@ export default function LoadingScreen({
           alignItems: "center",
           zIndex: 1,
           transform: isFadingOut ? "scale(0.96) translateY(-8px)" : "scale(1) translateY(0)",
-          transition: "transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)",
+          transition: "transform 0.65s cubic-bezier(0.16, 1, 0.3, 1)",
         }}>
         {/* Lingkaran Luar dengan Efek Pulsa & Rotasi Halus */}
         <div

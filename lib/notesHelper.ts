@@ -83,3 +83,61 @@ export function parseCombinedNotes(
 
   return { overallNotes, photoNotes };
 }
+
+/**
+ * Memformat komentar khusus per foto untuk kolom "Komentar Per Foto" pada tab Edited
+ */
+export function formatPhotoCommentsOnly(
+  photoNotes: Record<string, string>,
+  photos: Array<{ id: string; name: string }>,
+): string {
+  const photoMap = new Map(photos.map((p) => [p.id, p.name]));
+  const photoEntries = Object.entries(photoNotes)
+    .map(([id, note]) => ({
+      name: photoMap.get(id) || id,
+      note: (note || "").trim(),
+    }))
+    .filter((item) => item.note.length > 0);
+
+  if (photoEntries.length === 0) {
+    return "-";
+  }
+
+  return photoEntries.map((item) => `• ${item.name}: ${item.note}`).join("\n");
+}
+
+/**
+ * Mem-parsing string dari kolom "Komentar Per Foto" pada tab Edited kembali menjadi Record<photoId, comment>
+ */
+export function parsePhotoCommentsOnly(
+  rawComments: string,
+  photos: Array<{ id: string; name: string }>,
+): Record<string, string> {
+  const nameToIdMap = new Map(photos.map((p) => [p.name.toLowerCase().trim(), p.id]));
+  const photoNotes: Record<string, string> = {};
+
+  if (!rawComments || rawComments === "-") {
+    return photoNotes;
+  }
+
+  const lines = rawComments.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const cleanLine =
+      trimmed.startsWith("•") || trimmed.startsWith("-")
+        ? trimmed.substring(1).trim()
+        : trimmed;
+    const colonIdx = cleanLine.indexOf(":");
+    if (colonIdx > 0) {
+      const fileName = cleanLine.substring(0, colonIdx).trim().toLowerCase();
+      const noteText = cleanLine.substring(colonIdx + 1).trim();
+      const matchedId = nameToIdMap.get(fileName);
+      if (matchedId && noteText) {
+        photoNotes[matchedId] = noteText;
+      }
+    }
+  }
+
+  return photoNotes;
+}

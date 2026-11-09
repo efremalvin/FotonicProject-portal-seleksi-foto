@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { driveClient } from "@/lib/google/auth";
 import { driveThumbnailMap } from "@/lib/google/drive";
 
-// In-memory buffer cache untuk thumbnail galeri & fullview (sangat cepat, 1ms tanpa hit Google Drive berulang)
+// In-memory buffer cache untuk thumbnail galeri, fullview HD, & resolusi maksimal asli
 interface CachedThumbnail {
   buffer: ArrayBuffer;
   contentType: string;
@@ -10,20 +10,27 @@ interface CachedThumbnail {
 }
 const thumbnailBufferCache = new Map<string, CachedThumbnail>();
 const fullviewBufferCache = new Map<string, CachedThumbnail>();
+const maxviewBufferCache = new Map<string, CachedThumbnail>();
 const inFlightThumbRequests = new Map<string, Promise<CachedThumbnail | null>>();
 const THUMB_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 jam
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fileId = searchParams.get("id");
-  const isFull = searchParams.get("full") === "1" || searchParams.get("full") === "true";
+  const isMax = searchParams.get("max") === "1" || searchParams.get("max") === "true";
+  const isFull =
+    !isMax && (searchParams.get("full") === "1" || searchParams.get("full") === "true");
 
   if (!fileId) {
     return NextResponse.json({ error: "File ID wajib disertakan" }, { status: 400 });
   }
 
-  const cacheKey = isFull ? `full:${fileId}` : `thumb:${fileId}`;
-  const targetCache = isFull ? fullviewBufferCache : thumbnailBufferCache;
+  const cacheKey = isMax ? `max:${fileId}` : isFull ? `full:${fileId}` : `thumb:${fileId}`;
+  const targetCache = isMax
+    ? maxviewBufferCache
+    : isFull
+    ? fullviewBufferCache
+    : thumbnailBufferCache;
 
   // 1. Cek In-Memory Cache terlebih dahulu (Instan 1ms!)
   const cached = targetCache.get(fileId);
@@ -31,9 +38,10 @@ export async function GET(request: NextRequest) {
     return new NextResponse(cached.buffer, {
       headers: {
         "Content-Type": cached.contentType,
-        "Cache-Control": isFull
-          ? "public, max-age=604800, stale-while-revalidate=86400"
-          : "public, max-age=31536000, immutable",
+        "Cache-Control":
+          isMax || isFull
+            ? "public, max-age=604800, stale-while-revalidate=86400"
+            : "public, max-age=31536000, immutable",
       },
     });
   }
@@ -60,14 +68,21 @@ export async function GET(request: NextRequest) {
         }
 
         if (thumbUrl) {
-          // Mode fullview: gunakan =s1600 dari Google CDN (sangat tajam setara HD/2K, ukuran ~250KB vs 20MB raw file,
-          // tidak membuat RAM/GPU HP lamban crash atau lag saat zoom/pan, dan termuat 15x lebih cepat)
-          // Mode galeri: gunakan =w420 yang tajam untuk grid 2-4 kolom namun hemat bandwidth & memori
-          const targetUrl = isFull
+          // - Mode max (=s0): Resolusi maksimal asli 100% dari Google CDN (tanpa kompresi downscale)
+          // - Mode fullview (=s1600): Resolusi 2K HD cepat untuk transisi instan
+          // - Mode galeri (=w600): Tajam di layar Retina HP/Desktop namun sangat ringan (~40KB) untuk scroll 60fps
+          const targetUrl = isMax
+            ? thumbUrl.replace(/=s\d+$/, "=s0")
+            : isFull
             ? thumbUrl.replace(/=s\d+$/, "=s1600")
-            : thumbUrl.replace(/=s\d+$/, "=w420");
+            : thumbUrl.replace(/=s\d+$/, "=w600");
 
-          const response = await fetch(targetUrl);
+          let response = await fetch(targetUrl);
+          // Fallback jika =s0 ditolak oleh CDN tertentu, gunakan =s4096 (4K Ultra HD)
+          if (!response.ok && isMax) {
+            response = await fetch(thumbUrl.replace(/=s\d+$/, "=s4096"));
+          }
+
           if (response.ok) {
             const buffer = await response.arrayBuffer();
             const contentType = response.headers.get("content-type") || mimeType;
@@ -77,7 +92,7 @@ export async function GET(request: NextRequest) {
               timestamp: Date.now(),
             };
 
-            const maxItems = isFull ? 80 : 500;
+            const maxItems = isMax ? 25 : isFull ? 80 : 500;
             if (targetCache.size >= maxItems) {
               const oldestKey = targetCache.keys().next().value;
               if (oldestKey) targetCache.delete(oldestKey);
@@ -87,7 +102,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Fallback streaming media langsung jika thumbnailLink belum tersedia atau expired
+        // Fallback streaming media langsung dari Google Drive (resolusi asli penuh)
         const res = await driveClient.files.get(
           { fileId, alt: "media" },
           { responseType: "arraybuffer" }
@@ -118,9 +133,10 @@ export async function GET(request: NextRequest) {
   return new NextResponse(result.buffer, {
     headers: {
       "Content-Type": result.contentType,
-      "Cache-Control": isFull
-        ? "public, max-age=604800, stale-while-revalidate=86400"
-        : "public, max-age=31536000, immutable",
+      "Cache-Control":
+        isMax || isFull
+          ? "public, max-age=604800, stale-while-revalidate=86400"
+          : "public, max-age=31536000, immutable",
     },
   });
 }

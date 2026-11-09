@@ -29,6 +29,7 @@ interface HeroBannerProps {
   maxPhotos?: number;
   folderId?: string | null;
   bannerPhotoUrl?: string;
+  customQuotaLabel?: string;
 }
 
 function HeroBannerComponent({
@@ -37,6 +38,7 @@ function HeroBannerComponent({
   maxPhotos,
   folderId,
   bannerPhotoUrl,
+  customQuotaLabel,
 }: HeroBannerProps) {
   const bannerSrc =
     bannerPhotoUrl ||
@@ -275,10 +277,12 @@ function HeroBannerComponent({
               }}>
               <IconCalendar size={15} color="#d6a85a" />
               <span>{photoDate}</span>
-              {maxPhotos && (
+              {(customQuotaLabel || maxPhotos) && (
                 <>
                   <span style={{ opacity: 0.4 }}>•</span>
-                  <span style={{ color: "#ededed" }}>Kuota {maxPhotos} Foto</span>
+                  <span style={{ color: "#ededed" }}>
+                    {customQuotaLabel ? customQuotaLabel : `Kuota ${maxPhotos} Foto`}
+                  </span>
                 </>
               )}
             </div>
@@ -375,10 +379,12 @@ function HeroBannerComponent({
               }}>
               <IconCalendar size={16} color="#d6a85a" />
               <span>{photoDate}</span>
-              {maxPhotos && (
+              {(customQuotaLabel || maxPhotos) && (
                 <>
                   <span style={{ opacity: 0.4 }}>•</span>
-                  <span style={{ color: "#ededed" }}>Maksimal {maxPhotos} Foto</span>
+                  <span style={{ color: "#ededed" }}>
+                    {customQuotaLabel ? customQuotaLabel : `Maksimal ${maxPhotos} Foto`}
+                  </span>
                 </>
               )}
             </div>
