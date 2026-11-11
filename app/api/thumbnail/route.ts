@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { driveClient } from "@/lib/google/auth";
-import { driveThumbnailMap } from "@/lib/google/drive";
+import {
+  driveThumbnailMap,
+  isDriveItemInsideAllowedRoot,
+} from "@/lib/google/drive";
 
 // In-memory buffer cache untuk thumbnail galeri, fullview HD, & resolusi maksimal asli
 interface CachedThumbnail {
@@ -23,6 +26,14 @@ export async function GET(request: NextRequest) {
 
   if (!fileId) {
     return NextResponse.json({ error: "File ID wajib disertakan" }, { status: 400 });
+  }
+
+  const isAllowed = await isDriveItemInsideAllowedRoot(fileId, { allowFile: true });
+  if (!isAllowed) {
+    return NextResponse.json(
+      { error: "Akses ditolak: File foto tidak berada di dalam direktori resmi Fotonic." },
+      { status: 403 }
+    );
   }
 
   const cacheKey = isMax ? `max:${fileId}` : isFull ? `full:${fileId}` : `thumb:${fileId}`;

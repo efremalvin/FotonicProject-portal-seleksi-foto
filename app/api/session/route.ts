@@ -6,6 +6,8 @@ import {
 import {
   getPhotosFromFolder,
   getEditedPhotosFromFolder,
+  assertFolderAllowed,
+  FolderNotAllowedError,
 } from "@/lib/google/drive";
 import {
   parseCombinedNotes,
@@ -14,10 +16,10 @@ import {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const folderId = searchParams.get("folder_id");
+  const rawFolderId = searchParams.get("folder_id");
   const mode = searchParams.get("mode");
 
-  if (!folderId) {
+  if (!rawFolderId) {
     return NextResponse.json(
       { error: "Parameter folder_id belum ditentukan." },
       { status: 400 },
@@ -25,6 +27,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const folderId = await assertFolderAllowed(rawFolderId);
+
     if (mode === "edited") {
       const record = await getLatestEditedReviewFromSheet(folderId);
 
@@ -94,6 +98,12 @@ export async function GET(request: NextRequest) {
       photoNotes,
     });
   } catch (error: any) {
+    if (error instanceof FolderNotAllowedError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Gagal memeriksa sesi Google Sheets:", error);
     return NextResponse.json(
       { error: "Gagal memeriksa sesi Google Sheets." },

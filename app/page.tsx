@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { getFolderDetails, extractFolderId } from "@/lib/google/drive";
+import {
+  getFolderDetails,
+  extractFolderId,
+  isDriveItemInsideAllowedRoot,
+} from "@/lib/google/drive";
 import GalleryClient from "@/components/GalleryClient";
 
 interface PageProps {
@@ -17,12 +21,15 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 
   if (!clientName && folderId) {
     try {
-      const folderInfo = await getFolderDetails(folderId);
-      if (folderInfo?.clientName) {
-        clientName = folderInfo.clientName;
+      const isAllowed = await isDriveItemInsideAllowedRoot(folderId);
+      if (isAllowed) {
+        const folderInfo = await getFolderDetails(folderId);
+        if (folderInfo?.clientName) {
+          clientName = folderInfo.clientName;
+        }
       }
     } catch {
-      // Fallback ke judul default jika gagal mengambil nama folder
+      // Fallback ke judul default jika gagal mengambil nama folder atau di luar direktori resmi
     }
   }
 

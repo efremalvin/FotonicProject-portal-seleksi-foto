@@ -1,6 +1,23 @@
 import { driveClient } from "./auth";
 import type { drive_v3 } from "googleapis";
 
+/**
+ * Folder induk resmi Fotonic di Google Drive.
+ * Hanya folder/file yang berada di dalam direktori ini yang diizinkan diakses.
+ */
+export const ALLOWED_ROOT_FOLDER_ID = "1f6pznHVQyktvflAPYQO5W-4CTCwqZykL";
+
+export class FolderNotAllowedError extends Error {
+  status: number;
+  constructor(
+    message = "Akses ditolak: Link atau folder Google Drive tidak berada di dalam direktori resmi Fotonic.",
+  ) {
+    super(message);
+    this.name = "FolderNotAllowedError";
+    this.status = 403;
+  }
+}
+
 export interface DrivePhoto {
   id: string;
   name: string;
@@ -126,6 +143,192 @@ export function parseFolderInfo(rawFolderId: string, folderName: string): Folder
   };
 }
 
+// Cache validasi direktori induk resmi & in-flight deduplication
+interface CachedAllowedEntry {
+  allowed: boolean;
+  isFolder: boolean;
+  timestamp: number;
+}
+const allowedDescendantCache = new Map<string, CachedAllowedEntry>();
+const inFlightAllowedChecks = new Map<string, Promise<boolean>>();
+const ALLOWED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
+
+function setAllowedCacheEntry(id: string, allowed: boolean, isFolder: boolean) {
+  if (allowedDescendantCache.size >= 5000) {
+    const oldestKey = allowedDescendantCache.keys().next().value;
+    if (oldestKey) allowedDescendantCache.delete(oldestKey);
+  }
+  allowedDescendantCache.set(id, {
+    allowed,
+    isFolder,
+    timestamp: Date.now(),
+  });
+}
+
+/**
+ * Menandai ID item yang sudah dipastikan berasal dari folder tervalidasi
+ * agar pemeriksaan thumbnail/subfolder berikutnya instan tanpa hit Drive API ulang.
+ */
+export function markAllowedDescendant(id: string, isFolder: boolean) {
+  if (!id || id === ALLOWED_ROOT_FOLDER_ID) return;
+  setAllowedCacheEntry(id, true, isFolder);
+}
+
+/**
+ * Memverifikasi apakah ID Google Drive (folder atau file) berada di dalam
+ * folder induk resmi Fotonic (`ALLOWED_ROOT_FOLDER_ID`).
+ */
+export async function isDriveItemInsideAllowedRoot(
+  rawId: string,
+  options?: { allowFile?: boolean },
+): Promise<boolean> {
+  const allowFile = Boolean(options?.allowFile);
+  const targetId = extractFolderId(rawId);
+
+  if (!targetId || !/^[a-zA-Z0-9_-]{10,128}$/.test(targetId)) {
+    return false;
+  }
+
+  // Folder induk sendiri tidak boleh dibuka langsung sebagai folder klien
+  if (targetId === ALLOWED_ROOT_FOLDER_ID) {
+    return false;
+  }
+
+  const cached = allowedDescendantCache.get(targetId);
+  if (cached && Date.now() - cached.timestamp < ALLOWED_CACHE_TTL_MS) {
+    if (!cached.allowed) return false;
+    return allowFile ? true : cached.isFolder;
+  }
+
+  const checkKey = `${allowFile ? "file" : "folder"}:${targetId}`;
+  const existingCheck = inFlightAllowedChecks.get(checkKey);
+  if (existingCheck) {
+    return existingCheck;
+  }
+
+  const checkPromise = (async (): Promise<boolean> => {
+    const MAX_DEPTH = 12;
+    const visited = new Set<string>([targetId]);
+    const queue: Array<{ id: string; depth: number }> = [{ id: targetId, depth: 0 }];
+    const traversedFolders: string[] = [];
+    let targetIsFolder = false;
+
+    try {
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (current.depth > MAX_DEPTH) continue;
+
+        let data: drive_v3.Schema$File | undefined;
+        try {
+          const res = await driveClient.files.get({
+            fileId: current.id,
+            fields: "id, mimeType, parents, trashed",
+            supportsAllDrives: true,
+          });
+          data = res.data;
+        } catch (err: any) {
+          const status = err?.code || err?.status || err?.response?.status;
+          // Jika target utama 404/403/400, cache penolakan
+          if (current.depth === 0) {
+            if (status === 400 || status === 403 || status === 404) {
+              setAllowedCacheEntry(targetId, false, false);
+            }
+            return false;
+          }
+          continue;
+        }
+
+        if (!data || data.trashed) {
+          if (current.depth === 0) {
+            setAllowedCacheEntry(targetId, false, false);
+            return false;
+          }
+          continue;
+        }
+
+        const isFolder = data.mimeType === "application/vnd.google-apps.folder";
+        if (current.depth === 0) {
+          targetIsFolder = isFolder;
+          if (!allowFile && !isFolder) {
+            setAllowedCacheEntry(targetId, false, false);
+            return false;
+          }
+        } else if (isFolder) {
+          traversedFolders.push(current.id);
+        }
+
+        const parents = data.parents || [];
+        if (parents.includes(ALLOWED_ROOT_FOLDER_ID)) {
+          setAllowedCacheEntry(targetId, true, targetIsFolder);
+          for (const ancestorId of traversedFolders) {
+            setAllowedCacheEntry(ancestorId, true, true);
+          }
+          return true;
+        }
+
+        for (const parentId of parents) {
+          const parentCached = allowedDescendantCache.get(parentId);
+          if (
+            parentCached &&
+            Date.now() - parentCached.timestamp < ALLOWED_CACHE_TTL_MS &&
+            parentCached.allowed
+          ) {
+            setAllowedCacheEntry(targetId, true, targetIsFolder);
+            for (const ancestorId of traversedFolders) {
+              setAllowedCacheEntry(ancestorId, true, true);
+            }
+            return true;
+          }
+
+          if (
+            parentId !== ALLOWED_ROOT_FOLDER_ID &&
+            !visited.has(parentId) &&
+            current.depth + 1 <= MAX_DEPTH
+          ) {
+            visited.add(parentId);
+            queue.push({ id: parentId, depth: current.depth + 1 });
+          }
+        }
+      }
+
+      setAllowedCacheEntry(targetId, false, targetIsFolder);
+      return false;
+    } finally {
+      inFlightAllowedChecks.delete(checkKey);
+    }
+  })();
+
+  inFlightAllowedChecks.set(checkKey, checkPromise);
+  return checkPromise;
+}
+
+/**
+ * Memastikan folder ID berada di dalam direktori resmi Fotonic (`ALLOWED_ROOT_FOLDER_ID`).
+ * Melempar `FolderNotAllowedError` (HTTP 403) jika di luar direktori yang diizinkan.
+ */
+export async function assertFolderAllowed(rawFolderId: string): Promise<string> {
+  const folderId = extractFolderId(rawFolderId);
+
+  if (!folderId || !/^[a-zA-Z0-9_-]{10,128}$/.test(folderId)) {
+    throw new FolderNotAllowedError(
+      "Link atau ID folder Google Drive tidak valid.",
+    );
+  }
+
+  if (folderId === ALLOWED_ROOT_FOLDER_ID) {
+    throw new FolderNotAllowedError(
+      "Akses ditolak: Harap gunakan tautan folder klien yang berada di dalam direktori resmi Fotonic, bukan folder induknya.",
+    );
+  }
+
+  const allowed = await isDriveItemInsideAllowedRoot(folderId, { allowFile: false });
+  if (!allowed) {
+    throw new FolderNotAllowedError();
+  }
+
+  return folderId;
+}
+
 // Cache metadata folder & in-flight deduplication
 interface CachedFolderDetails {
   info: FolderParsedInfo;
@@ -139,7 +342,7 @@ const CACHE_TTL_MS = 3 * 60 * 1000; // 3 menit
  * Mengambil metadata folder Google Drive dan mem-parsing informasi klien
  */
 export async function getFolderDetails(rawFolderId: string): Promise<FolderParsedInfo> {
-  const folderId = extractFolderId(rawFolderId);
+  const folderId = await assertFolderAllowed(rawFolderId);
   const now = Date.now();
   const cached = folderDetailsCache.get(folderId);
   if (cached && now - cached.timestamp < CACHE_TTL_MS) {
@@ -238,7 +441,7 @@ export function check_is_expired(
 export async function getPhotosFromFolder(
   rawFolderId: string,
 ): Promise<DrivePhotosResult> {
-  const folderId = extractFolderId(rawFolderId);
+  const folderId = await assertFolderAllowed(rawFolderId);
 
   // 1. Cek In-Memory Cache
   const cached = folderPhotosCache.get(folderId);
@@ -285,6 +488,10 @@ export async function getPhotosFromFolder(
       const allSubfolders = allItems.filter(
         (f) => f.mimeType === "application/vnd.google-apps.folder"
       );
+      for (const sf of allSubfolders) {
+        if (sf.id) markAllowedDescendant(sf.id, true);
+      }
+
       const rootFiles = allItems.filter(
         (f) => f.mimeType && f.mimeType.toLowerCase().startsWith("image/")
       );
@@ -313,6 +520,7 @@ export async function getPhotosFromFolder(
         fName?: string
       ): DrivePhoto | null => {
         if (!file.id || !file.name || !file.mimeType) return null;
+        markAllowedDescendant(file.id, false);
         const meta = file.imageMediaMetadata;
         let width = meta?.width ?? undefined;
         let height = meta?.height ?? undefined;
@@ -424,6 +632,7 @@ export async function getPhotosFromFolder(
 
       return validPhotos;
     } catch (error) {
+      if (error instanceof FolderNotAllowedError) throw error;
       console.error("Gagal mengambil daftar foto dari Drive:", error);
       throw new Error("Gagal membaca folder Google Drive.");
     } finally {
@@ -438,7 +647,7 @@ export async function getPhotosFromFolder(
 export async function getBannerPhoto(
   rawParentFolderId: string,
 ): Promise<DrivePhoto | null> {
-  const parentFolderId = extractFolderId(rawParentFolderId);
+  const parentFolderId = await assertFolderAllowed(rawParentFolderId);
   try {
     let coverId = coverFolderCache.get(parentFolderId);
 
@@ -459,6 +668,7 @@ export async function getBannerPhoto(
     }
     return null;
   } catch (error) {
+    if (error instanceof FolderNotAllowedError) throw error;
     console.error("Gagal mendeteksi foto banner:", error);
     return null;
   }
@@ -470,7 +680,7 @@ export async function getBannerPhoto(
 export async function getEditedPhotosFromFolder(
   rawParentFolderId: string,
 ): Promise<DrivePhotosResult> {
-  const parentFolderId = extractFolderId(rawParentFolderId);
+  const parentFolderId = await assertFolderAllowed(rawParentFolderId);
 
   try {
     let editedId = editedFolderCache.get(parentFolderId);
@@ -497,8 +707,10 @@ export async function getEditedPhotosFromFolder(
       return emptyResult;
     }
 
+    markAllowedDescendant(editedId, true);
     return await getPhotosFromFolder(editedId);
   } catch (error) {
+    if (error instanceof FolderNotAllowedError) throw error;
     console.error("Gagal mengambil daftar foto dari subfolder Edited:", error);
     throw new Error("Gagal membaca folder Edited di Google Drive.");
   }

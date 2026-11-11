@@ -3,14 +3,16 @@ import {
   getPhotosFromFolder,
   getEditedPhotosFromFolder,
   getFolderDetails,
+  assertFolderAllowed,
+  FolderNotAllowedError,
 } from "@/lib/google/drive";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const folderId = searchParams.get("folder_id");
+  const rawFolderId = searchParams.get("folder_id");
   const mode = searchParams.get("mode");
 
-  if (!folderId) {
+  if (!rawFolderId) {
     return NextResponse.json(
       { error: "Parameter folder_id wajib disertakan" },
       { status: 400 },
@@ -18,6 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const folderId = await assertFolderAllowed(rawFolderId);
+
     const [photosData, folder] = await Promise.all([
       mode === "edited"
         ? getEditedPhotosFromFolder(folderId)
@@ -38,6 +42,12 @@ export async function GET(request: NextRequest) {
       sections: isExpired ? [] : ((photosData as any).sections || []),
     });
   } catch (error: any) {
+    if (error instanceof FolderNotAllowedError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       { error: error.message || "Gagal mengambil daftar foto" },
       { status: 500 },

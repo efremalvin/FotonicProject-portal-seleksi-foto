@@ -3,6 +3,8 @@ import {
   getPhotosFromFolder,
   getEditedPhotosFromFolder,
   getFolderDetails,
+  assertFolderAllowed,
+  FolderNotAllowedError,
 } from "@/lib/google/drive";
 import {
   appendSelectionToSheet,
@@ -17,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      folderId,
+      folderId: rawFolderId,
       clientName,
       max,
       selectedFileIds,
@@ -29,12 +31,14 @@ export async function POST(request: NextRequest) {
       mode,
     } = body;
 
-    if (!folderId) {
+    if (!rawFolderId) {
       return NextResponse.json(
         { error: "Format permintaan tidak valid" },
         { status: 400 },
       );
     }
+
+    const folderId = await assertFolderAllowed(rawFolderId);
 
     // ========================================================
     // MODE EDITED: Konfirmasi / Komentar Hasil Editan Foto (Tab "Edited")
@@ -181,6 +185,12 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
+    if (error instanceof FolderNotAllowedError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     console.error("Submission error:", error);
     return NextResponse.json(
       {

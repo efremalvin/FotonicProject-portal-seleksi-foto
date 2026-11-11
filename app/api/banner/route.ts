@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { driveClient } from "@/lib/google/auth";
-import { getBannerPhoto, extractFolderId } from "@/lib/google/drive";
+import {
+  getBannerPhoto,
+  extractFolderId,
+  assertFolderAllowed,
+  FolderNotAllowedError,
+} from "@/lib/google/drive";
 
 // Cache in-memory banner buffer per folderId (12 jam)
 interface CachedBanner {
@@ -20,6 +25,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: "Parameter folder_id belum ditentukan." },
       { status: 400 }
+    );
+  }
+
+  try {
+    await assertFolderAllowed(folderId);
+  } catch (error: any) {
+    if (error instanceof FolderNotAllowedError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json(
+      { error: "Gagal memvalidasi folder Google Drive." },
+      { status: 500 }
     );
   }
 
@@ -93,6 +110,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
+    if (error instanceof FolderNotAllowedError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("Gagal memuat gambar banner:", error);
     return NextResponse.json(
       { error: "Gagal mengambil gambar banner dari Google Drive." },
