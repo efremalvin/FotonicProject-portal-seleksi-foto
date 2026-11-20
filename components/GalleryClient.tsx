@@ -1402,6 +1402,7 @@ function GalleryContent() {
                   onClick={() => setShowClearConfirmModal(true)}
                   title="Hapus Seluruh Pilihan Foto"
                   style={{
+                    marginLeft: "auto",
                     pointerEvents: "auto",
                     backgroundColor: "#16161a",
                     border: "1.5px solid rgba(239, 68, 68, 0.45)",
@@ -1556,116 +1557,123 @@ function GalleryContent() {
                     style={{ fontSize: "22px", lineHeight: 1 }}>
                     save_as
                   </span>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", fontSize: "0.75rem", fontWeight: 700 }}>
                     {isSavingDraft ? "Menyimpan..." : "Simpan Sementara"}
                   </span>
                 </button>
-
-                {/* Tengah: Tombol Hapus Semua Pilihan (Mobile) */}
-                <button
-                  type="button"
-                  onClick={() => setShowClearConfirmModal(true)}
-                  aria-label="Hapus Seluruh Pilihan Foto"
-                  title="Hapus Seluruh Pilihan Foto"
+                
+                <div 
                   style={{
-                    pointerEvents: "auto",
-                    width: "48px",
-                    height: "48px",
-                    minWidth: "48px",
-                    minHeight: "48px",
-                    borderRadius: "50%",
-                    backgroundColor: "#16161a",
-                    border: "1.5px solid rgba(239, 68, 68, 0.45)",
-                    color: "#fca5a5",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.7), 0 0 12px rgba(239, 68, 68, 0.15)",
-                    padding: 0,
-                    flexShrink: 0,
+                    gap: "8px"
                   }}>
-                  <IconTrash size={20} color="#f87171" />
-                </button>
+                  {/* Tengah: Tombol Hapus Semua Pilihan (Mobile) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowClearConfirmModal(true)}
+                    aria-label="Hapus Seluruh Pilihan Foto"
+                    title="Hapus Seluruh Pilihan Foto"
+                    style={{
+                      pointerEvents: "auto",
+                      width: "48px",
+                      height: "48px",
+                      minWidth: "48px",
+                      minHeight: "48px",
+                      borderRadius: "50%",
+                      backgroundColor: "#16161a",
+                      border: "1.5px solid rgba(239, 68, 68, 0.45)",
+                      color: "#fca5a5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      boxShadow: "0 8px 24px rgba(0, 0, 0, 0.7), 0 0 12px rgba(239, 68, 68, 0.15)",
+                      padding: 0,
+                      flexShrink: 0,
+                    }}>
+                    <IconTrash size={20} color="#f87171" />
+                  </button>
 
-                {/* Kanan Bawah: Tombol Lihat Foto Terpilih + Angka Pilihan Foto (Mobile - Permintaan 1.c & 2.a) */}
-                <button
-                  onClick={handleGoToPreview}
-                  aria-label="Lihat Foto Terpilih"
-                  title={`Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`}
-                  style={{
-                    pointerEvents: "auto",
-                    position: "relative",
-                    overflow: "hidden",
-                    height: "48px",
-                    minHeight: "48px",
-                    border: "none",
-                    borderRadius: "9999px",
-                    padding: "0 16px",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    boxShadow: isQuotaFull
-                      ? "0 10px 30px rgba(34, 197, 94, 0.55), 0 0 16px rgba(34, 197, 94, 0.3)"
-                      : "0 10px 30px rgba(214, 168, 90, 0.45), 0 0 16px rgba(214, 168, 90, 0.2)",
-                  }}>
-                  {/* Layer 1: Background Emas Gradien */}
-                  <div
+                  {/* Kanan Bawah: Tombol Lihat Foto Terpilih + Angka Pilihan Foto (Mobile - Permintaan 1.c & 2.a) */}
+                  <button
+                    onClick={handleGoToPreview}
+                    aria-label="Lihat Foto Terpilih"
+                    title={`Lihat Foto Terpilih (${selectedIds.length}/${maxPhotos})`}
                     style={{
-                      position: "absolute",
-                      inset: 0,
-                      background:
-                        "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
-                      borderRadius: "inherit",
-                      zIndex: 1,
-                    }}
-                  />
-                  {/* Layer 2: Background Hijau Gradien saat kuota penuh */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background:
-                        "linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #15803d 100%)",
-                      borderRadius: "inherit",
-                      opacity: isQuotaFull ? 1 : 0,
-                      transition: "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
-                      zIndex: 2,
-                    }}
-                  />
-                  {/* Layer 3: Angka Pilihan Foto & Ikon arrow_forward */}
-                  <div
-                    style={{
+                      pointerEvents: "auto",
                       position: "relative",
-                      zIndex: 3,
+                      overflow: "hidden",
+                      height: "48px",
+                      minHeight: "48px",
+                      border: "none",
+                      borderRadius: "9999px",
+                      padding: "0 16px",
+                      cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
+                      justifyContent: "center",
                       gap: "6px",
-                      color: "#09090b",
+                      boxShadow: isQuotaFull
+                        ? "0 10px 30px rgba(34, 197, 94, 0.55), 0 0 16px rgba(34, 197, 94, 0.3)"
+                        : "0 10px 30px rgba(214, 168, 90, 0.45), 0 0 16px rgba(214, 168, 90, 0.2)",
                     }}>
-                    <span
+                    {/* Layer 1: Background Emas Gradien */}
+                    <div
                       style={{
-                        fontSize: "0.78rem",
-                        fontWeight: 800,
-                        whiteSpace: "nowrap",
-                        letterSpacing: "0.01em",
-                      }}>
-                      {`${selectedIds.length}/${maxPhotos}`}
-                    </span>
-                    <span
-                      className="material-symbols-outlined"
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(135deg, #f0cf8e 0%, #d6a85a 50%, #b9853a 100%)",
+                        borderRadius: "inherit",
+                        zIndex: 1,
+                      }}
+                    />
+                    {/* Layer 2: Background Hijau Gradien saat kuota penuh */}
+                    <div
                       style={{
-                        fontSize: "22px",
-                        lineHeight: 1,
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #15803d 100%)",
+                        borderRadius: "inherit",
+                        opacity: isQuotaFull ? 1 : 0,
+                        transition: "opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
+                        zIndex: 2,
+                      }}
+                    />
+                    {/* Layer 3: Angka Pilihan Foto & Ikon arrow_forward */}
+                    <div
+                      style={{
+                        position: "relative",
+                        zIndex: 3,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
                         color: "#09090b",
-                        fontWeight: 700,
                       }}>
-                      arrow_forward
-                    </span>
-                  </div>
-                </button>
+                      <span
+                        style={{
+                          fontSize: "0.78rem",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          letterSpacing: "0.01em",
+                        }}>
+                        {`${selectedIds.length}/${maxPhotos}`}
+                      </span>
+                      <span
+                        className="material-symbols-outlined"
+                        style={{
+                          fontSize: "22px",
+                          lineHeight: 1,
+                          color: "#09090b",
+                          fontWeight: 700,
+                        }}>
+                        arrow_forward
+                      </span>
+                    </div>
+                  </button>
+                </div>
               </div>
             )}
           </>

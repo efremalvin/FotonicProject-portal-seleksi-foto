@@ -140,7 +140,7 @@ export default function DraftSavedModal({
           }}>
           {isResume ? (
             <>
-              Halo <strong style={{ color: "#f0cf8e" }}>{clientName}</strong>, sesi draf pilihan foto Anda sebelumnya telah kami simpan di sistem.
+              Halo <strong style={{ color: "#f0cf8e" }}>{"Kak " + clientName}</strong>, sesi draf pilihan foto Anda sebelumnya telah kami simpan di sistem.
               <br />
               Anda dapat langsung melanjutkan memilih atau mengubah foto sesuai kuota Anda.
             </>

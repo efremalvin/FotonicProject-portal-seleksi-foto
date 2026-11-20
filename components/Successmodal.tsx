@@ -134,8 +134,8 @@ export default function SuccessModal({
             lineHeight: "1.5",
             marginBottom: "20px",
           }}>
-          Terima kasih Kak{" "}
-          <strong style={{ color: "#f0cf8e" }}>{clientName}</strong>. Foto
+          Terima kasih{" "}
+          <strong style={{ color: "#f0cf8e" }}>{"Kak " + clientName}</strong>. Foto
           pilihan Anda ({selectedFileNames.length} foto) telah tersimpan ke sistem Fotonic.
         </p>
 

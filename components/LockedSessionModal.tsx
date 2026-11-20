@@ -121,7 +121,7 @@ export default function LockedSessionModal({
             lineHeight: "1.5",
             marginBottom: "16px",
           }}>
-          Sesi seleksi foto untuk <strong style={{ color: "#f0cf8e" }}>{clientName}</strong> sebelumnya telah dikonfirmasi dan dikunci di sistem.
+          Sesi seleksi foto untuk <strong style={{ color: "#f0cf8e" }}>{"Kak " +clientName}</strong> sebelumnya telah dikonfirmasi dan dikunci di sistem.
         </p>
 
         {/* Kotak Ringkasan Data Terkunci */}

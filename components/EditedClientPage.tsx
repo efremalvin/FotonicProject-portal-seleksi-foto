@@ -2102,7 +2102,7 @@ function EditedGalleryContent() {
                   lineHeight: "1.5",
                   marginBottom: "16px",
                 }}>
-                Terima kasih Kak <strong style={{ color: "#f0cf8e" }}>{clientName}</strong>. Tinjauan dan komentar hasil editan Anda telah tercatat di sistem Fotonic.
+                Terima kasih <strong style={{ color: "#f0cf8e" }}>{"Kak " + clientName}</strong>. Tinjauan dan komentar hasil editan Anda telah tercatat di sistem Fotonic.
               </p>
 
               <div
