@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback } from "react";
 import MasonryGallery from "./MasonryGallery";
-import { IconPaper, IconPaperPlus, IconCalendar, IconImage, IconTrash } from "./Icons";
+import { IconPaper, IconPaperPlus, IconCalendar, IconImage, IconTrash } from "@/components/ui/Icons";
 
 export interface SelectedPhoto {
   id: string;

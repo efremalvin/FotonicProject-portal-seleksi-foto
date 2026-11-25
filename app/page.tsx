@@ -4,7 +4,7 @@ import {
   extractFolderId,
   isDriveItemInsideAllowedRoot,
 } from "@/lib/google/drive";
-import GalleryClient from "@/components/GalleryClient";
+import GalleryClient from "@/components/gallery/GalleryClient";
 
 interface PageProps {
   searchParams?: { [key: string]: string | string[] | undefined };

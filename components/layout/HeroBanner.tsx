@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, memo } from "react";
-import { IconCalendar } from "./Icons";
+import { IconCalendar } from "@/components/ui/Icons";
 
 function InstagramIcon({ size = 15, color = "currentColor" }: { size?: number; color?: string }) {
   return (

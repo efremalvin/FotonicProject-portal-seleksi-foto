@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { IconPaper, IconImage } from "./Icons";
+import { IconPaper, IconImage } from "@/components/ui/Icons";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 
 interface PhotoNoteModalProps {

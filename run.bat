@@ -6,7 +6,7 @@ cd /d "%~dp0"
 :MENU
 cls
 echo ========================================================
-echo        FOTONIC - WEB SELEKSI FOTO KLIEN LAUNCHER       
+echo        FOTONIC - WEB SELEKSI FOTO KLIEN LAUNCHER
 echo ========================================================
 echo.
 echo Direktori Kerja : %~dp0
@@ -45,22 +45,20 @@ if exist ".env.local" (
 echo Pilihan Menu:
 echo   [1] Jalankan Next.js (Mode Development - Rekomendasi)
 echo   [2] Build ^& Jalankan Next.js (Mode Production)
-echo   [3] Jalankan Versi Streamlit (legacy-streamlit/app.py)
-echo   [4] Buka URL Uji Coba Demo Klien di Browser
-echo   [5] Install / Update Dependensi (npm install)
-echo   [6] Bersihkan Cache Next.js (Reset folder .next)
-echo   [7] Keluar
+echo   [3] Buka URL Uji Coba Demo Klien di Browser
+echo   [4] Install / Update Dependensi (npm install)
+echo   [5] Bersihkan Cache Next.js (Reset folder .next)
+echo   [6] Keluar
 echo.
 set "PILIHAN="
-set /p "PILIHAN=Pilih nomor menu [1-7]: "
+set /p "PILIHAN=Pilih nomor menu [1-6]: "
 
 if "%PILIHAN%"=="1" goto RUN_DEV
 if "%PILIHAN%"=="2" goto RUN_PROD
-if "%PILIHAN%"=="3" goto RUN_STREAMLIT
-if "%PILIHAN%"=="4" goto OPEN_DEMO
-if "%PILIHAN%"=="5" goto RUN_INSTALL
-if "%PILIHAN%"=="6" goto CLEAN_CACHE
-if "%PILIHAN%"=="7" goto KELUAR
+if "%PILIHAN%"=="3" goto OPEN_DEMO
+if "%PILIHAN%"=="4" goto RUN_INSTALL
+if "%PILIHAN%"=="5" goto CLEAN_CACHE
+if "%PILIHAN%"=="6" goto KELUAR
 
 echo.
 echo [!] Pilihan tidak valid. Silakan coba lagi.
@@ -70,14 +68,13 @@ goto MENU
 :RUN_DEV
 cls
 echo ========================================================
-echo   Menjalankan Next.js Development Server (Port 3000)   
+echo   Menjalankan Next.js Development Server (Port 3000)
 echo ========================================================
 echo   - Local   : http://localhost:3000
-echo   - Network : http://192.168.1.11:3000
-echo   - HP Demo : http://192.168.1.11:3000/?folder_id=1-NAhCpCPE6IgEkzqIJalkx4IzIfjVEHk
+echo   - Edited  : http://localhost:3000/edited
 echo.
 
-:: Bersihkan cache build jika ada sisa mode build (mencegah Cannot find module ./787.js)
+:: Bersihkan cache build jika ada sisa mode build
 if exist ".next\BUILD_ID" (
     echo [INFO] Membersihkan cache build production sebelumnya...
     rmdir /s /q ".next" >nul 2>&1
@@ -85,7 +82,7 @@ if exist ".next\BUILD_ID" (
 
 if not "!TARGET_FOLDER!"=="" (
     echo Membuka demo klien dengan TEST_DRIVE_FOLDER_ID dari .env.local...
-    start "" "http://localhost:3000/?klien=Demo+Klien&folder_id=!TARGET_FOLDER!&max=15"
+    start "" "http://localhost:3000/?folder_id=!TARGET_FOLDER!"
 ) else (
     echo Membuka http://localhost:3000...
     start "" "http://localhost:3000"
@@ -101,7 +98,7 @@ goto MENU
 :RUN_PROD
 cls
 echo ========================================================
-echo   Menyiapkan Next.js Production Build                   
+echo   Menyiapkan Next.js Production Build
 echo ========================================================
 echo Melakukan kompilasi 'npm run build'...
 call npm run build
@@ -118,44 +115,11 @@ call npm start
 pause
 goto MENU
 
-:RUN_STREAMLIT
-cls
-echo ========================================================
-echo   Menjalankan Prototype Streamlit Python (Port 8501)   
-echo ========================================================
-echo Mencoba menjalankan via Python / Streamlit...
-echo.
-where streamlit >nul 2>&1
-if %errorlevel% equ 0 (
-    streamlit run app.py
-    pause
-    goto MENU
-)
-
-where py >nul 2>&1
-if %errorlevel% equ 0 (
-    py -m streamlit run app.py
-    pause
-    goto MENU
-)
-
-where python >nul 2>&1
-if %errorlevel% equ 0 (
-    python -m streamlit run app.py
-    pause
-    goto MENU
-)
-
-echo [ERROR] Python / Streamlit tidak terdeteksi pada sistem.
-echo Silakan install Python terlebih dahulu atau gunakan Next.js (Menu 1).
-pause
-goto MENU
-
 :OPEN_DEMO
 cls
 echo Membuka URL demo di browser bawaan...
 if not "!TARGET_FOLDER!"=="" (
-    start "" "http://localhost:3000/?klien=Demo+Klien&folder_id=!TARGET_FOLDER!&max=15"
+    start "" "http://localhost:3000/?folder_id=!TARGET_FOLDER!"
 ) else (
     start "" "http://localhost:3000"
 )
@@ -174,7 +138,7 @@ goto MENU
 :CLEAN_CACHE
 cls
 echo ========================================================
-echo         Membersihkan Cache Next.js (.next)             
+echo         Membersihkan Cache Next.js (.next)
 echo ========================================================
 echo.
 if exist ".next" (

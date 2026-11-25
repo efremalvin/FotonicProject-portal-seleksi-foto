@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title Fotonic - Git Repository Sync
+title Fotonic - Git Repository Sync (newversion)
 cd /d "%~dp0"
 
 where git >nul 2>&1
@@ -13,15 +13,18 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+set "DEFAULT_BRANCH=newversion"
+
 :MENU
 cls
 echo ========================================================
-echo        FOTONIC - GIT REPO SYNC MANAGER (GITHUB)        
+echo        FOTONIC - GIT REPO SYNC MANAGER (GITHUB)
 echo ========================================================
-echo Direktori : %~dp0
-set "CURRENT_BRANCH=main"
+echo Direktori       : %~dp0
+set "CURRENT_BRANCH=%DEFAULT_BRANCH%"
 for /f "tokens=*" %%a in ('git branch --show-current 2^>nul') do set "CURRENT_BRANCH=%%a"
-echo Branch Saat Ini : %CURRENT_BRANCH%
+echo Branch Aktif    : %CURRENT_BRANCH%
+echo Default Push    : origin/%DEFAULT_BRANCH%
 echo.
 
 echo Status Perubahan Terkini:
@@ -33,20 +36,22 @@ if %errorlevel% neq 0 (
 echo --------------------------------------------------------
 echo.
 echo Pilihan Menu:
-echo   [1] Push Update ke GitHub (Add All + Commit + Push)
-echo   [2] Tarik Pembaruan Terbaru dari GitHub (Git Pull)
+echo   [1] Push Update ke GitHub (Branch default: %DEFAULT_BRANCH%)
+echo   [2] Tarik Pembaruan Terbaru dari GitHub (Git Pull %DEFAULT_BRANCH%)
 echo   [3] Cek Status Detail ^& Riwayat Commit (Git Status ^& Log)
-echo   [4] Batalkan Perubahan Lokal (Discard All Uncommitted Changes)
-echo   [5] Keluar
+echo   [4] Pindah ke Branch Default (%DEFAULT_BRANCH%)
+echo   [5] Batalkan Perubahan Lokal (Discard All Uncommitted Changes)
+echo   [6] Keluar
 echo.
 set "PILIHAN="
-set /p "PILIHAN=Pilih nomor menu [1-5]: "
+set /p "PILIHAN=Pilih nomor menu [1-6]: "
 
 if "%PILIHAN%"=="1" goto PUSH_REPO
 if "%PILIHAN%"=="2" goto PULL_REPO
 if "%PILIHAN%"=="3" goto STATUS_LOG
-if "%PILIHAN%"=="4" goto DISCARD_CHANGES
-if "%PILIHAN%"=="5" goto KELUAR
+if "%PILIHAN%"=="4" goto SWITCH_DEFAULT
+if "%PILIHAN%"=="5" goto DISCARD_CHANGES
+if "%PILIHAN%"=="6" goto KELUAR
 
 echo.
 echo [!] Pilihan tidak valid. Silakan coba lagi.
@@ -56,9 +61,14 @@ goto MENU
 :PUSH_REPO
 cls
 echo ========================================================
-echo          PUSH UPDATE KE REPOSITORY GITHUB              
+echo      PUSH UPDATE KE GITHUB (origin/%DEFAULT_BRANCH%)
 echo ========================================================
 echo.
+if /i not "%CURRENT_BRANCH%"=="%DEFAULT_BRANCH%" (
+    echo [INFO] Branch saat ini adalah '%CURRENT_BRANCH%'.
+    echo        Target push default proyek ini adalah '%DEFAULT_BRANCH%'.
+    echo.
+)
 echo File yang berubah / bertambah:
 git status -s
 echo.
@@ -84,12 +94,12 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo Menjalankan 'git push origin %CURRENT_BRANCH%'...
-git push origin %CURRENT_BRANCH%
+echo Menjalankan 'git push -u origin HEAD:%DEFAULT_BRANCH%'...
+git push -u origin HEAD:%DEFAULT_BRANCH%
 if %errorlevel% equ 0 (
     echo.
     echo ========================================================
-    echo [SUKSES] Perubahan berhasil di-push ke GitHub!
+    echo [SUKSES] Perubahan berhasil di-push ke origin/%DEFAULT_BRANCH%!
     echo ========================================================
 ) else (
     echo.
@@ -104,13 +114,13 @@ goto MENU
 :PULL_REPO
 cls
 echo ========================================================
-echo       MENARIK PEMBARUAN DARI GITHUB (GIT PULL)         
+echo    MENARIK PEMBARUAN DARI GITHUB (origin/%DEFAULT_BRANCH%)
 echo ========================================================
-echo Menjalankan 'git pull origin %CURRENT_BRANCH%'...
-git pull origin %CURRENT_BRANCH%
+echo Menjalankan 'git pull origin %DEFAULT_BRANCH%'...
+git pull origin %DEFAULT_BRANCH%
 if %errorlevel% equ 0 (
     echo.
-    echo [SUKSES] Repository lokal telah sinkron dengan GitHub!
+    echo [SUKSES] Repository lokal telah sinkron dengan origin/%DEFAULT_BRANCH%!
 ) else (
     echo.
     echo [PERINGATAN] Gagal melakukan pull atau terjadi konflik.
@@ -121,11 +131,14 @@ goto MENU
 :STATUS_LOG
 cls
 echo ========================================================
-echo              STATUS DETAIL ^& LOG COMMIT                 
+echo              STATUS DETAIL ^& LOG COMMIT
 echo ========================================================
 echo.
 echo --- Remote URL ---
 git remote -v
+echo.
+echo --- Branch Lokal ^& Remote ---
+git branch -vv
 echo.
 echo --- Git Status Lengkap ---
 git status
@@ -136,10 +149,23 @@ echo.
 pause
 goto MENU
 
+:SWITCH_DEFAULT
+cls
+echo ========================================================
+echo          PINDAH KE BRANCH DEFAULT (%DEFAULT_BRANCH%)
+echo ========================================================
+git checkout %DEFAULT_BRANCH%
+if %errorlevel% neq 0 (
+    echo [INFO] Membuat branch lokal '%DEFAULT_BRANCH%'...
+    git checkout -b %DEFAULT_BRANCH%
+)
+pause
+goto MENU
+
 :DISCARD_CHANGES
 cls
 echo ========================================================
-echo         BATALKAN SELURUH PERUBAHAN LOKAL               
+echo         BATALKAN SELURUH PERUBAHAN LOKAL
 echo ========================================================
 echo.
 echo [PERINGATAN] Tindakan ini akan menghapus seluruh perubahan

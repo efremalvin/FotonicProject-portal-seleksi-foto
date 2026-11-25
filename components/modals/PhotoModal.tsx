@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { lockScroll, unlockScroll } from "@/lib/scrollLock";
-import { IconPaper, IconPaperPlus, IconImage } from "./Icons";
+import { IconPaper, IconPaperPlus, IconImage } from "@/components/ui/Icons";
 
 export interface FullviewPhoto {
   id: string;

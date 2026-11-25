@@ -14,11 +14,8 @@ export const metadata: Metadata = {
   title: "Fotonic - Seleksi Foto Klien",
   description: "Portal seleksi foto resmi klien Fotonic Photo & Video Project",
   icons: {
-    icon: [
-      { url: "/Fotonic Logo White.ico", sizes: "any" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
-    shortcut: "/Fotonic Logo White.ico",
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
+    shortcut: "/favicon.ico",
     apple: "/og-logo.png",
   },
   openGraph: {
@@ -58,8 +55,8 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
-        <link rel="icon" href="/Fotonic Logo White.ico" sizes="any" />
-        <link rel="shortcut icon" href="/Fotonic Logo White.ico" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/og-logo.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { IconLocation } from "./Icons";
+import { IconLocation } from "@/components/ui/Icons";
 
 /**
  * Ikon WhatsApp persis seperti Web-Porto (Outline bubble hijau dengan gagang telepon di dalam)

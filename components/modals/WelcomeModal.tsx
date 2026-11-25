@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { lockScroll, unlockScroll, forceUnlockScroll } from "@/lib/scrollLock";
-import { IconCalendar } from "./Icons";
+import { IconCalendar } from "@/components/ui/Icons";
 
 interface WelcomeModalProps {
   clientName: string;
@@ -88,7 +88,7 @@ export default function WelcomeModal({
         {/* Logo Fotonic */}
         <div style={{ marginBottom: "20px" }}>
           <img
-            src="/whitelogo1.png"
+            src="/images/whitelogo1.png"
             alt="Fotonic Photo & Video Project"
             style={{
               maxWidth: "150px",

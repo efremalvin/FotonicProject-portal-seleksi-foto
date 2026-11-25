@@ -4,7 +4,7 @@ import {
   extractFolderId,
   isDriveItemInsideAllowedRoot,
 } from "@/lib/google/drive";
-import EditedClientPage from "@/components/EditedClientPage";
+import EditedClientPage from "@/components/gallery/EditedClientPage";
 
 interface PageProps {
   searchParams?: { [key: string]: string | string[] | undefined };

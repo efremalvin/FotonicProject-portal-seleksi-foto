@@ -2,21 +2,21 @@
 
 import React, { Suspense, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import WelcomeModal from "@/components/WelcomeModal";
-import HeroBanner from "@/components/HeroBanner";
-import ProgressBar from "@/components/ProgressBar";
-import PhotoCard from "@/components/PhotoCard";
-import PhotoModal from "@/components/PhotoModal";
-import PreviewView from "@/components/PreviewView";
-import SuccessModal from "@/components/Successmodal";
-import Footer from "@/components/Footer";
-import MasonryGallery from "@/components/MasonryGallery";
-import LoadingScreen from "@/components/LoadingScreen";
-import DraftSavedModal from "@/components/DraftSavedModal";
-import LockedSessionModal from "@/components/LockedSessionModal";
-import PhotoNoteModal from "@/components/PhotoNoteModal";
-import ExpiredLockScreen from "@/components/ExpiredLockScreen";
-import { IconTrash } from "@/components/Icons";
+import WelcomeModal from "@/components/modals/WelcomeModal";
+import HeroBanner from "@/components/layout/HeroBanner";
+import ProgressBar from "@/components/gallery/ProgressBar";
+import PhotoCard from "@/components/gallery/PhotoCard";
+import PhotoModal from "@/components/modals/PhotoModal";
+import PreviewView from "@/components/gallery/PreviewView";
+import SuccessModal from "@/components/modals/SuccessModal";
+import Footer from "@/components/layout/Footer";
+import MasonryGallery from "@/components/gallery/MasonryGallery";
+import LoadingScreen from "@/components/layout/LoadingScreen";
+import DraftSavedModal from "@/components/modals/DraftSavedModal";
+import LockedSessionModal from "@/components/modals/LockedSessionModal";
+import PhotoNoteModal from "@/components/modals/PhotoNoteModal";
+import ExpiredLockScreen from "@/components/layout/ExpiredLockScreen";
+import { IconTrash } from "@/components/ui/Icons";
 import { forceUnlockScroll } from "@/lib/scrollLock";
 
 interface Photo {
@@ -592,7 +592,7 @@ function GalleryContent() {
               boxShadow: "0 24px 60px rgba(0,0,0,0.8), 0 0 25px rgba(214, 168, 90, 0.15)",
             }}>
             <img
-              src="/whitelogo1.png"
+              src="/images/whitelogo1.png"
               alt="Fotonic Photo & Video Project"
               style={{
                 maxWidth: "140px",

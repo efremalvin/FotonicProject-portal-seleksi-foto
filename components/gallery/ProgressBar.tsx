@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useState, useEffect, useRef } from "react";
-import { IconFolder } from "@/components/Icons";
+import { IconFolder } from "@/components/ui/Icons";
 
 export interface NavSectionItem {
   id: string;
