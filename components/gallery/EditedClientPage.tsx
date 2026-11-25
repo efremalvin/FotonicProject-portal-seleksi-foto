@@ -24,6 +24,8 @@ interface Photo {
   isLandscape?: boolean;
   folderId?: string;
   folderName?: string;
+  beforeId?: string;
+  beforeName?: string;
 }
 
 interface FolderSection {
@@ -543,6 +545,7 @@ function EditedGalleryContent() {
   const [sections, setSections] = useState<FolderSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExpired, setIsExpired] = useState(false);
+  const [expiredDate, setExpiredDate] = useState<string | null>(null);
   const [noEditedFolder, setNoEditedFolder] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -699,6 +702,7 @@ function EditedGalleryContent() {
 
         if (data.isExpired) {
           setIsExpired(true);
+          setExpiredDate(data.expiredDate || null);
           setPhotos([]);
           return;
         }
@@ -1112,7 +1116,14 @@ function EditedGalleryContent() {
   }
 
   if (!isLoading && isExpired) {
-    return <ExpiredLockScreen clientName={clientName} sessionDate={photoDate} />;
+    return (
+      <ExpiredLockScreen
+        clientName={clientName}
+        sessionDate={photoDate}
+        mode="edited"
+        expiredDate={expiredDate}
+      />
+    );
   }
 
   return (

@@ -85,6 +85,7 @@ function GalleryContent() {
 
   // Status Sesi Kedaluwarsa (Expired State)
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [expiredDate, setExpiredDate] = useState<string | null>(null);
 
   // Sinkronisasi judul tab browser dengan nama klien dari Google Drive
   useEffect(() => {
@@ -180,6 +181,7 @@ function GalleryContent() {
         // Jika sesi berstatus expired, hentikan pemuatan galeri dan alihkan ke Expired Lock Screen
         if (data.isExpired) {
           setIsExpired(true);
+          setExpiredDate(data.expiredDate || null);
           setIsLoading(false);
           setShowWelcome(false);
           setShowLockedModal(false);
@@ -689,6 +691,8 @@ function GalleryContent() {
         clientName={folderInfo?.clientName || urlClient || "Klien Fotonic"}
         sessionDate={folderInfo?.photoDate || urlDate}
         folderName={folderInfo?.folderName}
+        mode="selection"
+        expiredDate={expiredDate}
       />
     );
   }

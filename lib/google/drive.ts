@@ -28,6 +28,8 @@ export interface DrivePhoto {
   isLandscape?: boolean;
   folderId?: string;
   folderName?: string;
+  beforeId?: string;
+  beforeName?: string;
 }
 
 export interface FolderSection {
@@ -41,6 +43,7 @@ export type DrivePhotosResult = DrivePhoto[] & {
   sections?: FolderSection[];
   isExpired?: boolean;
   noEditedFolder?: boolean;
+  hasBeforeAfter?: boolean;
 };
 
 export interface FolderParsedInfo {
@@ -674,8 +677,20 @@ export async function getBannerPhoto(
   }
 }
 
+function normalizeStem(filename: string): string {
+  return filename
+    .trim()
+    .toLowerCase()
+    .replace(/\.[^.]+$/, "")
+    .replace(/(?:[-_\s]+(?:edited|edit|after|final|retouch))+$/i, "")
+    .trim();
+}
+
 /**
- * Mengambil foto-foto khusus dari subfolder "Edited" di dalam folder utama klien
+ * Mengambil foto-foto khusus dari subfolder "Edited" di dalam folder utama klien.
+ * Jika di dalam folder "Edited" terdapat subfolder "Before" dan "After",
+ * maka fitur Before & After otomatis aktif (galeri utama tetap menampilkan foto "After"
+ * dan setiap foto dipasangkan dengan foto "Before" berdasarkan nama file).
  */
 export async function getEditedPhotosFromFolder(
   rawParentFolderId: string,
@@ -704,11 +719,77 @@ export async function getEditedPhotosFromFolder(
       emptyResult.noEditedFolder = true;
       emptyResult.hasSubfolders = false;
       emptyResult.sections = [];
+      emptyResult.hasBeforeAfter = false;
       return emptyResult;
     }
 
     markAllowedDescendant(editedId, true);
-    return await getPhotosFromFolder(editedId);
+
+    // Cek isi langsung dari folder "Edited" untuk mendeteksi subfolder "Before" & "After" (atau "Expired")
+    const editedItemsRes = await driveClient.files.list({
+      q: `'${editedId}' in parents and trashed = false`,
+      fields: "files(id, name, mimeType)",
+      pageSize: 200,
+    });
+    const editedItems = editedItemsRes.data.files || [];
+
+    const editedSubfolders = editedItems.filter(
+      (f) => f.mimeType === "application/vnd.google-apps.folder"
+    );
+    for (const sf of editedSubfolders) {
+      if (sf.id) markAllowedDescendant(sf.id, true);
+    }
+
+    const beforeFolder = editedSubfolders.find(
+      (f) => f.name && f.name.trim().toLowerCase() === "before"
+    );
+    const afterFolder = editedSubfolders.find(
+      (f) => f.name && f.name.trim().toLowerCase() === "after"
+    );
+
+    if (beforeFolder?.id && afterFolder?.id) {
+      const [afterPhotos, beforePhotos] = await Promise.all([
+        getPhotosFromFolder(afterFolder.id),
+        getPhotosFromFolder(beforeFolder.id),
+      ]);
+
+      const beforeByExactName = new Map<string, DrivePhoto>();
+      const beforeByStem = new Map<string, DrivePhoto>();
+      for (const bp of beforePhotos) {
+        const lowerName = bp.name.trim().toLowerCase();
+        if (!beforeByExactName.has(lowerName)) {
+          beforeByExactName.set(lowerName, bp);
+        }
+        const stem = normalizeStem(bp.name);
+        if (stem && !beforeByStem.has(stem)) {
+          beforeByStem.set(stem, bp);
+        }
+      }
+
+      const pairedResult = afterPhotos.map((ap) => {
+        const exactMatch = beforeByExactName.get(ap.name.trim().toLowerCase());
+        const stemMatch = beforeByStem.get(normalizeStem(ap.name));
+        const matched = exactMatch || stemMatch;
+        if (matched) {
+          return {
+            ...ap,
+            beforeId: matched.id,
+            beforeName: matched.name,
+          };
+        }
+        return ap;
+      }) as DrivePhotosResult;
+
+      pairedResult.hasSubfolders = afterPhotos.hasSubfolders || false;
+      pairedResult.sections = afterPhotos.sections || [];
+      pairedResult.isExpired = afterPhotos.isExpired || false;
+      pairedResult.hasBeforeAfter = true;
+      return pairedResult;
+    }
+
+    const standardEdited = await getPhotosFromFolder(editedId);
+    standardEdited.hasBeforeAfter = false;
+    return standardEdited;
   } catch (error) {
     if (error instanceof FolderNotAllowedError) throw error;
     console.error("Gagal mengambil daftar foto dari subfolder Edited:", error);

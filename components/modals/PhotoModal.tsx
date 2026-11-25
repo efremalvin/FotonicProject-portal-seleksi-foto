@@ -10,6 +10,8 @@ export interface FullviewPhoto {
   isLandscape?: boolean;
   width?: number;
   height?: number;
+  beforeId?: string;
+  beforeName?: string;
 }
 
 interface PhotoModalProps {
@@ -59,7 +61,10 @@ export default function PhotoModal({
   const dragStartRef = useRef({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
   const fullImgRef = useRef<HTMLImageElement | null>(null);
+  const beforeImgRef = useRef<HTMLImageElement | null>(null);
   const thumbImgRef = useRef<HTMLImageElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const isSlidingRef = useRef(false);
 
   // Transisi Drop To Black antar gambar (200ms)
   const [isBlackout, setIsBlackout] = useState(false);
@@ -68,6 +73,12 @@ export default function PhotoModal({
   const [isFullLoaded, setIsFullLoaded] = useState(false);
   const [maxResSrc, setMaxResSrc] = useState<string | null>(null);
   const [isMaxLoading, setIsMaxLoading] = useState(false);
+
+  // Before & After Slider (Aktif jika currentPhoto.beforeId tersedia)
+  const hasBeforeAfter = Boolean(currentPhoto?.beforeId);
+  const [sliderPos, setSliderPos] = useState(50);
+  const [isBeforeLoaded, setIsBeforeLoaded] = useState(false);
+  const [beforeMaxResSrc, setBeforeMaxResSrc] = useState<string | null>(null);
 
   // Touch References untuk Ketuk Dua Kali Instan (Tanpa Hold), Pinch Zoom, & Swipe
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -90,12 +101,27 @@ export default function PhotoModal({
           : "opacity 160ms ease-out";
         fullImgRef.current.style.transform = transformStr;
       }
+      if (beforeImgRef.current) {
+        beforeImgRef.current.style.transition = animate
+          ? "opacity 160ms ease-out, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
+          : "opacity 160ms ease-out";
+        beforeImgRef.current.style.transform = transformStr;
+      }
       if (thumbImgRef.current) {
         thumbImgRef.current.style.transform = transformStr;
       }
     },
     []
   );
+
+  const updateSliderFromClientX = useCallback((clientX: number) => {
+    const el = stageRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    setSliderPos(Math.max(2, Math.min(98, pct)));
+  }, []);
 
   // Otomatis sinkronkan index atau tutup jika list foto kosong
   useEffect(() => {
@@ -125,6 +151,9 @@ export default function PhotoModal({
     setIsFullLoaded(false);
     setMaxResSrc(null);
     setIsMaxLoading(false);
+    setSliderPos(50);
+    setIsBeforeLoaded(false);
+    setBeforeMaxResSrc(null);
   }, [currentIndex]);
 
   // Stage 3: Upgrade Progresif ke Resolusi Maksimal Asli (&max=1 / =s0) di Background Worker (Zero UI Lag!)
@@ -133,6 +162,9 @@ export default function PhotoModal({
 
     let cancelled = false;
     const targetMaxUrl = `/api/thumbnail?id=${currentPhoto.id}&max=1`;
+    const targetBeforeMaxUrl = currentPhoto.beforeId
+      ? `/api/thumbnail?id=${currentPhoto.beforeId}&max=1`
+      : null;
 
     const timer = setTimeout(() => {
       if (cancelled) return;
@@ -152,7 +184,6 @@ export default function PhotoModal({
           .decode()
           .then(finishMaxUpgrade)
           .catch(() => {
-            // Jika decode() gagal pada browser lama namun gambar berhasil onload, tetap gunakan
             if (!cancelled) setIsMaxLoading(false);
           });
       } else {
@@ -160,6 +191,21 @@ export default function PhotoModal({
         maxImg.onerror = () => {
           if (!cancelled) setIsMaxLoading(false);
         };
+      }
+
+      if (targetBeforeMaxUrl) {
+        const beforeMaxImg = new Image();
+        beforeMaxImg.decoding = "async";
+        beforeMaxImg.src = targetBeforeMaxUrl;
+        const finishBeforeMax = () => {
+          if (cancelled) return;
+          setBeforeMaxResSrc(targetBeforeMaxUrl);
+        };
+        if (typeof beforeMaxImg.decode === "function") {
+          beforeMaxImg.decode().then(finishBeforeMax).catch(() => {});
+        } else {
+          beforeMaxImg.onload = finishBeforeMax;
+        }
       }
     }, 120);
 
@@ -459,6 +505,9 @@ export default function PhotoModal({
   };
 
   const activeFullSrc = maxResSrc || `/api/thumbnail?id=${currentPhoto.id}&full=1`;
+  const activeBeforeSrc = currentPhoto.beforeId
+    ? beforeMaxResSrc || `/api/thumbnail?id=${currentPhoto.beforeId}&full=1`
+    : null;
 
   return (
     <div
@@ -557,6 +606,7 @@ export default function PhotoModal({
           - Stage 3: Resolusi Maksimal Asli (max=1 / =s0) tanpa lag via async decode()
           ======================================================== */}
       <div
+        ref={stageRef}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -639,7 +689,7 @@ export default function PhotoModal({
           />
         )}
 
-        {/* Gambar Resolusi Penuh / Maksimal Asli dari Sumber Google Drive */}
+        {/* Gambar Resolusi Penuh / Maksimal Asli dari Sumber Google Drive (After / Utama) */}
         <img
           ref={fullImgRef}
           key={currentPhoto.id}
@@ -665,7 +715,181 @@ export default function PhotoModal({
             pointerEvents: "auto",
           }}
         />
+
+        {/* Lapisan Before (RAW) + Interactive Split Slider jika tersedia */}
+        {hasBeforeAfter && activeBeforeSrc && (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                WebkitClipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                zIndex: 15,
+              }}>
+              <img
+                ref={beforeImgRef}
+                key={`before-${currentPhoto.beforeId}`}
+                src={activeBeforeSrc}
+                alt={`Before ${currentPhoto.name}`}
+                decoding="async"
+                onLoad={() => setIsBeforeLoaded(true)}
+                onError={() => setIsBeforeLoaded(true)}
+                draggable={false}
+                style={{
+                  maxWidth: "100vw",
+                  maxHeight: "100vh",
+                  objectFit: "contain",
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                  transformOrigin: "center center",
+                  willChange: "transform, opacity",
+                  opacity: isBlackout || !isFullLoaded || !isBeforeLoaded ? 0 : 1,
+                  transition: isBlackout
+                    ? "opacity 100ms ease-in"
+                    : isDragging
+                    ? "none"
+                    : "opacity 160ms ease-out, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+
+            {/* Garis & Pegangan Slider Vertikal */}
+            {isFullLoaded && !isBlackout && (
+              <div
+                role="slider"
+                aria-label="Slider Perbandingan Before dan After"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sliderPos)}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  isSlidingRef.current = true;
+                  try {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  } catch {}
+                  updateSliderFromClientX(e.clientX);
+                }}
+                onPointerMove={(e) => {
+                  if (!isSlidingRef.current) return;
+                  e.stopPropagation();
+                  updateSliderFromClientX(e.clientX);
+                }}
+                onPointerUp={(e) => {
+                  if (!isSlidingRef.current) return;
+                  e.stopPropagation();
+                  isSlidingRef.current = false;
+                  try {
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                  } catch {}
+                }}
+                onPointerCancel={() => {
+                  isSlidingRef.current = false;
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: `${sliderPos}%`,
+                  transform: "translateX(-50%)",
+                  width: "44px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "ew-resize",
+                  touchAction: "none",
+                  zIndex: 35,
+                }}>
+                {/* Garis Vertikal Gold */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    width: "2px",
+                    backgroundColor: "#d6a85a",
+                    boxShadow: "0 0 12px rgba(214, 168, 90, 0.85)",
+                    pointerEvents: "none",
+                  }}
+                />
+                {/* Pegangan Tengah */}
+                <div
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(18, 18, 22, 0.94)",
+                    border: "2px solid #d6a85a",
+                    color: "#f0cf8e",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.9rem",
+                    fontWeight: 800,
+                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(214, 168, 90, 0.35)",
+                    pointerEvents: "none",
+                  }}>
+                  ⇄
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* Label Pojok Before (RAW) & After (Edited) saat Slider Aktif */}
+      {hasBeforeAfter && isFullLoaded && !isBlackout && (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: "64px",
+              left: "16px",
+              backgroundColor: "rgba(12, 12, 16, 0.85)",
+              color: "#f0cf8e",
+              border: "1px solid rgba(214, 168, 90, 0.45)",
+              borderRadius: "9999px",
+              padding: "5px 12px",
+              fontSize: "0.72rem",
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.6)",
+              pointerEvents: "none",
+              zIndex: 45,
+            }}>
+            Before (RAW)
+          </div>
+
+          <div
+            style={{
+              position: "absolute",
+              bottom: "70px",
+              right: "16px",
+              backgroundColor: "rgba(12, 12, 16, 0.85)",
+              color: "#f0cf8e",
+              border: "1px solid rgba(214, 168, 90, 0.45)",
+              borderRadius: "9999px",
+              padding: "5px 12px",
+              fontSize: "0.72rem",
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.6)",
+              pointerEvents: "none",
+              zIndex: 45,
+            }}>
+            After (Edited)
+          </div>
+        </>
+      )}
 
       {/* ========================================================
           4. POJOK KIRI BAWAH: TOMBOL KEMBALI / MINIMIZE
